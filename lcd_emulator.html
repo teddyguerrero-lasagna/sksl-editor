@@ -1,0 +1,2922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCD & Object Pixel Emulator</title>
+    <!-- Google Sans Mono Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Mono:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            color: #333333;
+            font-family: 'Google Sans Mono', monospace;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Explicitly enable text selection, focus and typing for all inputs and textareas */
+        input, textarea, select, [contenteditable="true"] {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        /* Top Header Bar */
+        .header-bar {
+            height: 50px;
+            padding: 0 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #e0e0e0;
+            background-color: #f8f8f8;
+            box-sizing: border-box;
+            overflow: hidden;
+            white-space: nowrap;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
+            z-index: 20;
+        }
+
+        .header-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .app-title {
+            font-weight: 700;
+            font-size: 13px;
+            color: #111111;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-right: 6px;
+        }
+
+        .app-title span.dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ed225d;
+            display: inline-block;
+        }
+
+        /* General Buttons & Selects matching SkSL editor */
+        button {
+            background: #ffffff;
+            color: #555555;
+            border: 1px solid #cccccc;
+            padding: 4px 14px;
+            cursor: pointer;
+            border-radius: 20px;
+            height: 28px;
+            box-sizing: border-box;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            border-color: #ed225d;
+            color: #ed225d;
+        }
+
+        button.active {
+            background: #ed225d;
+            color: #ffffff;
+            border-color: #ed225d;
+        }
+
+        button.btn-primary {
+            background: #333333;
+            color: #ffffff;
+            border-color: #333333;
+        }
+
+        button.btn-primary:hover {
+            background: #111111;
+            color: #ffffff;
+            border-color: #111111;
+        }
+
+        button.btn-recording {
+            background: #d32f2f !important;
+            color: #ffffff !important;
+            border-color: #d32f2f !important;
+            animation: pulseRecord 1.2s infinite alternate;
+        }
+
+        @keyframes pulseRecord {
+            from { opacity: 1; }
+            to { opacity: 0.6; }
+        }
+
+        select {
+            background: #ffffff;
+            color: #555555;
+            border: 1px solid #cccccc;
+            padding: 4px 12px;
+            border-radius: 20px;
+            outline: none;
+            height: 28px;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 13px;
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        select:hover {
+            border-color: #ed225d;
+            color: #ed225d;
+        }
+
+        input[type="text"] {
+            background: #ffffff;
+            color: #333333;
+            border: 1px solid #cccccc;
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            height: 28px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #ed225d;
+        }
+
+        /* Main Workspace Split */
+        #workspace {
+            flex: 1;
+            display: flex;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Controls Panel */
+        #controls-panel {
+            width: 410px;
+            min-width: 300px;
+            max-width: 560px;
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        #controls-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #ffffff;
+        }
+
+        /* Resizer bar */
+        .resizer {
+            width: 10px;
+            cursor: col-resize;
+            z-index: 10;
+            margin-left: -5px;
+            margin-right: -5px;
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .resizer::after {
+            content: '';
+            width: 1px;
+            height: 100%;
+            background: #e0e0e0;
+            transition: background 0.2s;
+        }
+
+        .resizer:hover::after, .resizer.dragging::after {
+            background: #ed225d;
+            width: 2px;
+        }
+
+        /* Preview Panel */
+        #preview-panel {
+            flex: 1;
+            min-width: 320px;
+            display: flex;
+            flex-direction: column;
+            background-color: #f4f4f4;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #preview-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Flat Canvas matching user requirement */
+        canvas#glCanvas {
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: none;
+            border: 1px solid #e0e0e0;
+            border-radius: 0;
+            background: #000000;
+        }
+
+        /* Section Headers & Titles */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 26px 0 14px 0;
+            padding-top: 14px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .section-header:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #777777;
+        }
+
+        .badge-pill {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: rgba(237, 34, 93, 0.1);
+            color: #ed225d;
+            font-weight: 600;
+        }
+
+        /* Control Groups */
+        .control-group {
+            margin-bottom: 18px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            color: #555555;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        /* Sliders with Pink Accents */
+        .slider-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            flex: 1;
+            background: transparent;
+            cursor: ew-resize;
+            margin: 5px 0;
+        }
+
+        input[type="range"]:focus {
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #ed225d;
+            -webkit-appearance: none;
+            margin-top: -5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-moz-range-track {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #ed225d;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Numerical Readout / Value Pill Input */
+        .val-pill, input.val-pill {
+            width: 62px;
+            height: 26px;
+            border: 1px solid #cccccc;
+            border-radius: 15px;
+            text-align: center;
+            color: #444444;
+            font-size: 13px;
+            font-family: inherit;
+            background: #ffffff;
+            box-sizing: border-box;
+            flex-shrink: 0;
+            outline: none;
+            padding: 2px 6px;
+            cursor: text;
+            transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        input.val-pill:hover {
+            border-color: #ed225d;
+            color: #111111;
+        }
+
+        input.val-pill:focus {
+            border-color: #ed225d;
+            color: #111111;
+            box-shadow: 0 0 0 2px rgba(237, 34, 93, 0.15);
+            background: #ffffff;
+        }
+
+        input.val-pill::-webkit-outer-spin-button,
+        input.val-pill::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Pill Button Clusters */
+        .btn-cluster {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .btn-cluster button {
+            flex: 1;
+            min-width: 65px;
+            padding: 4px 10px;
+            height: 28px;
+        }
+
+        /* Shape Selector Grid */
+        .shape-cluster {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .shape-cluster button {
+            height: 32px;
+            padding: 4px 8px;
+            border-radius: 16px;
+            font-size: 12px;
+        }
+
+        /* Toggle Row */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            margin-bottom: 10px;
+            color: #555555;
+            font-size: 13px;
+        }
+
+        /* Color Picker & Swatches */
+        .color-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .color-chip {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 1px solid #cccccc;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .color-chip:hover {
+            transform: scale(1.15);
+            border-color: #ed225d;
+        }
+
+        .color-chip.active {
+            border-color: #ed225d;
+            box-shadow: 0 0 0 2px rgba(237, 34, 93, 0.4);
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            border: none;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid #cccccc;
+            border-radius: 50%;
+        }
+
+        /* Video Transport Bar */
+        #video-transport {
+            position: absolute;
+            bottom: 24px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #cccccc;
+            border-radius: 24px;
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 30;
+            min-width: 380px;
+        }
+
+        #video-transport.hidden {
+            display: none !important;
+        }
+
+        .time-text {
+            font-size: 13px;
+            color: #555555;
+            min-width: 95px;
+            text-align: center;
+        }
+
+        /* Drag & Drop Overlay */
+        #drop-overlay {
+            position: absolute;
+            inset: 20px;
+            border: 2px dashed #ed225d;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.94);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        #drop-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #drop-overlay svg {
+            width: 48px;
+            height: 48px;
+            stroke: #ed225d;
+            margin-bottom: 12px;
+        }
+
+        #drop-overlay h2 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #222222;
+            margin-bottom: 6px;
+        }
+
+        #drop-overlay p {
+            font-size: 13px;
+            color: #777777;
+        }
+
+        /* Ramp level rows */
+        .ramp-level-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+
+        .ramp-level-row span.slot-tag {
+            color: #555;
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 85px;
+        }
+
+        .ramp-level-row select {
+            flex: 1;
+            height: 28px;
+            font-size: 12px;
+            text-align: left;
+            padding-left: 8px;
+        }
+
+        .ramp-level-row .custom-icon-box {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .ramp-level-row .custom-icon-box input[type="text"] {
+            width: 48px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        /* Global Scrollbars matching SkSL editor */
+        *::-webkit-scrollbar, ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        *::-webkit-scrollbar-track, ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        *::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb {
+            background: #cccccc;
+            border-radius: 99px;
+        }
+
+        *::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:hover {
+            background: #aaaaaa;
+        }
+
+        .info-note {
+            background: #f8f8f8;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #666666;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Bar across top -->
+    <div class="header-bar">
+        <div class="header-group">
+            <div class="app-title">
+                <span class="dot"></span>
+                <span>LCD & Pixel Lab</span>
+            </div>
+
+            <!-- Preset Dropdown -->
+            <select id="preset-select" style="min-width: 170px;">
+                <option value="single_stars">⭐ Single: 5-Point Star</option>
+                <option value="single_square">■ Single: Flat Square</option>
+                <option value="single_circle">● Single: Dot Matrix</option>
+                <option value="single_lcd">🚥 Single: LCD RGB Subpixels</option>
+                <option value="ramp_cosmic">✦ Greyscale: Cosmic Stars</option>
+                <option value="ramp_ascii">🔤 Greyscale: ASCII Shapes</option>
+                <option value="ramp_custom_emoji">🎨 Greyscale: Custom Emojis</option>
+            </select>
+        </div>
+
+        <div class="header-group">
+            <button id="openFileBtn">Open Media (GIF/MP4/IMG)</button>
+            <input type="file" id="filePicker" accept="image/*,video/*,.gif,.mp4,.webm,.mov" style="display:none;">
+            <button id="demoCycleBtn">Cycle Demo</button>
+        </div>
+
+        <div class="header-group">
+            <button id="snapshotBtn">Snapshot PNG</button>
+            <button id="recordBtn" class="btn-primary">Record WebM</button>
+        </div>
+    </div>
+
+    <!-- Workspace -->
+    <div id="workspace">
+        
+        <!-- Controls Panel (Left side) -->
+        <div id="controls-panel">
+            <div id="controls-content">
+
+                <!-- SECTION 0: ONLY 2 MAPPING MODES -->
+                <div class="section-header">
+                    <span class="section-title">Mapping Mode</span>
+                    <span class="badge-pill" id="modeBadge">SINGLE SHAPE</span>
+                </div>
+
+                <div class="btn-cluster" id="modeGroup">
+                    <button class="active" data-mode="0" style="padding: 6px 16px; font-weight:600;">Single Shape</button>
+                    <button data-mode="1" style="padding: 6px 16px; font-weight:600;">Greyscale Ramp</button>
+                </div>
+
+                <!-- MODE 0: SINGLE SHAPE SELECTION -->
+                <div id="sectionSingleShape">
+                    <div class="section-header">
+                        <span class="section-title">Active Pixel Shape</span>
+                    </div>
+
+                    <div class="shape-cluster" id="primaryShapeGrid">
+                        <button class="active" data-shape="3">⭐ 5-Star</button>
+                        <button data-shape="4">✨ 4-Star</button>
+                        <button data-shape="0">Square</button>
+                        <button data-shape="1">Rounded</button>
+                        <button data-shape="2">Circle</button>
+                        <button data-shape="5">Diamond</button>
+                        <button data-shape="6">Cross</button>
+                        <button data-shape="7">Heart</button>
+                        <button data-shape="8">Triangle</button>
+                        <button data-shape="9">Ring</button>
+                        <button data-shape="10">RGB LCD</button>
+                        <button data-shape="12">Custom Icon</button>
+                    </div>
+
+                    <div id="singleCustomBox" style="display:none; margin-bottom: 12px; background:#f8f8f8; padding:10px; border-radius:12px; border:1px solid #e0e0e0;">
+                        <label style="margin-bottom:6px; display:block; color:#555;">Type Custom Emoji / Glyph / SVG:</label>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="text" id="singleCustomInput" value="✦" style="width: 50px; text-align:center; font-size:16px;">
+                            <button id="singleUploadBtn" style="flex:1;">Upload PNG/SVG Icon</button>
+                            <input type="file" id="singleFileInput" accept="image/*" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="control-group" id="cornerRadiusGroup" style="display:none;">
+                        <label>Corner Roundness</label>
+                        <div class="slider-row">
+                            <input type="range" id="paramCornerRadius" min="0" max="1" step="0.02" value="0.4">
+                            <input type="text" class="val-pill" id="valCornerRadius" value="40%">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODE 1: GREYSCALE SHAPE RAMP (WITH CUSTOM ICONS/SHAPES) -->
+                <div id="sectionGreyscaleRamp" style="display:none;">
+                    <div class="section-header">
+                        <span class="section-title">Greyscale Tonal Shape Ramp</span>
+                    </div>
+
+                    <div class="info-note">
+                        Assign shapes, emojis, or uploaded custom icons across 5 greyscale tonal levels from shadows to highlights.
+                    </div>
+
+                    <div class="control-group">
+                        <label>Ramp Presets</label>
+                        <div class="btn-cluster" id="rampPresets">
+                            <button data-ramppreset="cosmic">Cosmic Stars</button>
+                            <button data-ramppreset="ascii">ASCII Shapes</button>
+                            <button data-ramppreset="emojis">Emojis / Icons</button>
+                            <button data-ramppreset="minimal">Minimal Geo</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>5 Tonal Level Shape Slots</label>
+
+                        <!-- Level 1 (0-20%) -->
+                        <div class="ramp-level-row">
+                            <span class="slot-tag">L1 (0-20%)</span>
+                            <select id="rampSlot0" data-slot="0">
+                                <option value="11" selected>Empty / Blank</option>
+                                <option value="2">Circle (Dot)</option>
+                                <option value="6">Cross (✚)</option>
+                                <option value="5">Diamond (◆)</option>
+                                <option value="4">4-Star (✦)</option>
+                                <option value="3">5-Star (★)</option>
+                                <option value="0">Square (■)</option>
+                                <option value="custom">Custom Icon...</option>
+                            </select>
+                            <div class="custom-icon-box" id="customBox0" style="display:none;">
+                                <input type="text" id="customInput0" value="·" style="width: 48px; text-align: center; font-size: 14px;">
+                                <button class="upload-btn" data-slot="0">File</button>
+                                <input type="file" id="fileSlot0" accept="image/*" style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- Level 2 (20-40%) -->
+                        <div class="ramp-level-row">
+                            <span class="slot-tag">L2 (20-40%)</span>
+                            <select id="rampSlot1" data-slot="1">
+                                <option value="2">Circle (Dot)</option>
+                                <option value="9">Ring (◎)</option>
+                                <option value="6" selected>Cross (✚)</option>
+                                <option value="5">Diamond (◆)</option>
+                                <option value="4">4-Star (✦)</option>
+                                <option value="3">5-Star (★)</option>
+                                <option value="1">Rounded Square</option>
+                                <option value="custom">Custom Icon...</option>
+                            </select>
+                            <div class="custom-icon-box" id="customBox1" style="display:none;">
+                                <input type="text" id="customInput1" value="✦" style="width: 48px; text-align: center; font-size: 14px;">
+                                <button class="upload-btn" data-slot="1">File</button>
+                                <input type="file" id="fileSlot1" accept="image/*" style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- Level 3 (40-60%) -->
+                        <div class="ramp-level-row">
+                            <span class="slot-tag">L3 (40-60%)</span>
+                            <select id="rampSlot2" data-slot="2">
+                                <option value="2" selected>Circle</option>
+                                <option value="9">Ring (◎)</option>
+                                <option value="4">4-Star (✦)</option>
+                                <option value="3">5-Star (★)</option>
+                                <option value="7">Heart (♥)</option>
+                                <option value="6">Cross (✚)</option>
+                                <option value="1">Rounded Square</option>
+                                <option value="custom">Custom Icon...</option>
+                            </select>
+                            <div class="custom-icon-box" id="customBox2" style="display:none;">
+                                <input type="text" id="customInput2" value="★" style="width: 48px; text-align: center; font-size: 14px;">
+                                <button class="upload-btn" data-slot="2">File</button>
+                                <input type="file" id="fileSlot2" accept="image/*" style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- Level 4 (60-80%) -->
+                        <div class="ramp-level-row">
+                            <span class="slot-tag">L4 (60-80%)</span>
+                            <select id="rampSlot3" data-slot="3">
+                                <option value="4">4-Star (✦)</option>
+                                <option value="3" selected>5-Star (★)</option>
+                                <option value="7">Heart (♥)</option>
+                                <option value="8">Triangle (▲)</option>
+                                <option value="1">Rounded Square</option>
+                                <option value="0">Square (■)</option>
+                                <option value="custom">Custom Icon...</option>
+                            </select>
+                            <div class="custom-icon-box" id="customBox3" style="display:none;">
+                                <input type="text" id="customInput3" value="✿" style="width: 48px; text-align: center; font-size: 14px;">
+                                <button class="upload-btn" data-slot="3">File</button>
+                                <input type="file" id="fileSlot3" accept="image/*" style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- Level 5 (80-100%) -->
+                        <div class="ramp-level-row">
+                            <span class="slot-tag">L5 (80-100%)</span>
+                            <select id="rampSlot4" data-slot="4">
+                                <option value="0" selected>Square (■)</option>
+                                <option value="1">Rounded Square</option>
+                                <option value="3">5-Star (★)</option>
+                                <option value="7">Heart (♥)</option>
+                                <option value="custom">Custom Icon...</option>
+                            </select>
+                            <div class="custom-icon-box" id="customBox4" style="display:none;">
+                                <input type="text" id="customInput4" value="■" style="width: 48px; text-align: center; font-size: 14px;">
+                                <button class="upload-btn" data-slot="4">File</button>
+                                <input type="file" id="fileSlot4" accept="image/*" style="display:none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="toggle-row">
+                        <span>Invert Tonal Direction</span>
+                        <button id="btnInvertRamp" style="width: 75px;">Off</button>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Ramp Driver Metric</label>
+                        <div class="btn-cluster" id="rampDriverGroup">
+                            <button class="active" data-driver="0">Greyscale (Luminance)</button>
+                            <button data-driver="1">Saturation (Vibrancy)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION: IMAGE SCALE, CROP & CANVAS SIZING -->
+                <div class="section-header">
+                    <span class="section-title">Image Framing & Canvas Sizing</span>
+                    <span class="badge-pill" id="canvasSizeBadge">AUTO-RESIZING</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Framing Mode</label>
+                    <div class="btn-cluster" id="fitModeGroup">
+                        <button class="active" data-fit="0">Fit (Contain)</button>
+                        <button data-fit="1">Fill (Crop)</button>
+                        <button data-fit="2">Stretch</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Image Zoom (Scale)</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramImageZoom" min="0.5" max="3.0" step="0.05" value="1.0">
+                        <input type="text" class="val-pill" id="valImageZoom" value="100%">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Image Pan X (Horizontal Crop Offset)</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramImagePanX" min="-1.0" max="1.0" step="0.02" value="0.0">
+                        <input type="text" class="val-pill" id="valImagePanX" value="0%">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Image Pan Y (Vertical Crop Offset)</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramImagePanY" min="-1.0" max="1.0" step="0.02" value="0.0">
+                        <input type="text" class="val-pill" id="valImagePanY" value="0%">
+                    </div>
+                </div>
+
+                <!-- SECTION: MEDIA PLAYBACK & LOOPING (MP4 & ANIMATED GIF) -->
+                <div class="section-header" id="mediaPlaybackHeader" style="display: none;">
+                    <span class="section-title">Playback & Looping</span>
+                    <span class="badge-pill" id="mediaTypeBadge">VIDEO</span>
+                </div>
+
+                <div id="mediaPlaybackSection" style="display: none;">
+                    <div class="control-group">
+                        <label>Transport Controls</label>
+                        <div class="btn-cluster" style="margin-bottom: 8px;">
+                            <button id="sidePlayPauseBtn" style="flex: 1;">⏸ Pause</button>
+                            <button id="sideLoopBtn" class="active" style="flex: 1;">Loop: ON</button>
+                            <button id="sideRestartBtn" style="padding: 4px 10px;">↺ Replay</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Timeline Scrub <span id="sideTimeDisplay" style="color: #ed225d; font-weight: 600;">00:00 / 00:00</span></label>
+                        <div class="slider-row">
+                            <input type="range" id="sideScrub" min="0" max="100" value="0" step="0.1">
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>Playback Speed</label>
+                        <div class="btn-cluster" id="speedCluster">
+                            <button data-speed="0.5">0.5x</button>
+                            <button class="active" data-speed="1.0">1.0x</button>
+                            <button data-speed="1.5">1.5x</button>
+                            <button data-speed="2.0">2.0x</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION: PIXEL SCALE & GEOMETRY -->
+                <div class="section-header">
+                    <span class="section-title">Pixel Scale & Spacing</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Pixel Scale (Size)</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramPixelSize" min="4" max="120" step="1" value="28">
+                        <input type="text" class="val-pill" id="valPixelSize" value="28px">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Pixel Gap (Border Spacing)</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramPixelGap" min="0.0" max="0.6" step="0.01" value="0.15">
+                        <input type="text" class="val-pill" id="valPixelGap" value="15%">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Pixel Rotation</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramRotation" min="0" max="360" step="1" value="0">
+                        <input type="text" class="val-pill" id="valRotation" value="0°">
+                    </div>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Auto-Spin Pixels</span>
+                    <button id="btnAutoSpin" style="width: 75px;">Off</button>
+                </div>
+
+                <!-- SECTION: COLOR & TONAL GRADING -->
+                <div class="section-header">
+                    <span class="section-title">Color & Tonal Grading</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Color Saturation</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramSaturation" min="0.0" max="3.5" step="0.05" value="1.8">
+                        <input type="text" class="val-pill" id="valSaturation" value="1.80x">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Contrast Punch</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramContrast" min="0.5" max="2.0" step="0.05" value="1.15">
+                        <input type="text" class="val-pill" id="valContrast" value="1.15x">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Brightness Exposure</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramBrightness" min="-0.5" max="0.5" step="0.02" value="0.0">
+                        <input type="text" class="val-pill" id="valBrightness" value="0.00">
+                    </div>
+                </div>
+
+                <!-- SECTION: OBJECT SIZE DYNAMICS -->
+                <div class="section-header">
+                    <span class="section-title">Object Size Dynamics</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Size Driver</label>
+                    <div class="btn-cluster" id="sizeDriverGroup">
+                        <button class="active" data-driver="0">Uniform</button>
+                        <button data-driver="1">Luminance</button>
+                        <button data-driver="2">Saturation</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Minimum Object Scale</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramMinScale" min="0.05" max="1.0" step="0.05" value="0.35">
+                        <input type="text" class="val-pill" id="valMinScale" value="35%">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Maximum Object Scale</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramMaxScale" min="0.5" max="1.5" step="0.05" value="1.0">
+                        <input type="text" class="val-pill" id="valMaxScale" value="100%">
+                    </div>
+                </div>
+
+                <div class="toggle-row">
+                    <span>Invert Size Scaling</span>
+                    <button id="btnInvertSize" style="width: 75px;">Off</button>
+                </div>
+
+                <!-- SECTION: GRID PATTERN & BACKGROUND -->
+                <div class="section-header">
+                    <span class="section-title">Grid & Background</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Grid Pattern</label>
+                    <div class="btn-cluster" id="gridTypeGroup">
+                        <button class="active" data-grid="0">Orthogonal</button>
+                        <button data-grid="1">Brick Stagger</button>
+                        <button data-grid="2">Honeycomb Hex</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Cell Aspect Ratio</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramAspect" min="0.5" max="2.0" step="0.05" value="1.0">
+                        <input type="text" class="val-pill" id="valAspect" value="1.00">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Background Color</label>
+                    <div class="color-row">
+                        <div class="color-chip active" style="background:#06070a;" data-color="#06070a" title="Black"></div>
+                        <div class="color-chip" style="background:#141724;" data-color="#141724" title="Dark Blue"></div>
+                        <div class="color-chip" style="background:#282b36;" data-color="#282b36" title="Slate"></div>
+                        <div class="color-chip" style="background:#8b956d;" data-color="#8b956d" title="Olive DMG"></div>
+                        <div class="color-chip" style="background:#f4f5f8;" data-color="#f4f5f8" title="White"></div>
+                        <input type="color" id="customBgColor" value="#06070a" title="Custom color picker">
+                        <input type="text" id="customBgHex" class="val-pill" value="#06070A" style="width: 78px; text-transform: uppercase;">
+                    </div>
+                </div>
+
+                <!-- SECTION: RETRO FILTERS & FLAT GRID -->
+                <div class="section-header">
+                    <span class="section-title">Retro Filters & Grid Lines</span>
+                </div>
+
+                <div class="control-group">
+                    <label>Pixel Grid Separation Lines</label>
+                    <div class="slider-row">
+                        <input type="range" id="paramScanlines" min="0.0" max="1.0" step="0.05" value="0.0">
+                        <input type="text" class="val-pill" id="valScanlines" value="0%">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Palette Filters</label>
+                    <div class="btn-cluster" id="filterColorGroup">
+                        <button class="active" data-filter="0">Full RGB</button>
+                        <button data-filter="1">Cyberpunk</button>
+                        <button data-filter="2">Amber CRT</button>
+                        <button data-filter="3">DMG-01</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Resizer Divider -->
+        <div class="resizer" id="resizer"></div>
+
+        <!-- Preview Viewport (Right side) -->
+        <div id="preview-panel">
+            <div id="preview-content">
+                <canvas id="glCanvas"></canvas>
+
+                <!-- Drag & Drop Overlay -->
+                <div id="drop-overlay">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M12 8v8"></path>
+                        <path d="m8 12 4-4 4 4"></path>
+                    </svg>
+                    <h2>Drop Image, GIF, or Video (MP4) Here</h2>
+                    <p>Canvas will auto-resize and loop seamlessly</p>
+                </div>
+
+                <!-- Video / GIF Transport Bar -->
+                <div id="video-transport" class="hidden">
+                    <button id="playPauseBtn" style="width: 32px; height: 32px; padding: 0; border-radius: 50%;">
+                        <svg id="playIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <svg id="pauseIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    </button>
+                    <input type="range" id="videoScrub" min="0" max="100" value="0" step="0.1" style="flex: 1;">
+                    <span class="time-text" id="videoTime">00:00 / 00:00</span>
+                    <button id="loopToggleBtn" class="active" style="padding: 4px 10px; font-size: 11px;">Loop: ON</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Hidden elements for video/demo source & custom icon atlas -->
+    <video id="hiddenVideo" playsinline webkit-playsinline loop muted crossorigin="anonymous" style="display:none;"></video>
+    <canvas id="demoCanvas" width="800" height="800" style="display:none;"></canvas>
+    <canvas id="iconAtlasCanvas" width="768" height="128" style="display:none;"></canvas>
+
+    <script>
+        // ==========================================
+        // WEBGL2 FLAT SHADER PIPELINE
+        // ==========================================
+        const canvas = document.getElementById('glCanvas');
+        const previewContent = document.getElementById('preview-content');
+        const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, antialias: true }) || canvas.getContext('webgl', { preserveDrawingBuffer: true });
+
+        if (!gl) {
+            alert('WebGL is not supported in this browser.');
+        }
+
+        const vsSource = `#version 300 es
+            in vec2 aPosition;
+            out vec2 vUv;
+            void main() {
+                vUv = aPosition * 0.5 + 0.5;
+                gl_Position = vec4(aPosition, 0.0, 1.0);
+            }
+        `;
+
+        const fsSource = `#version 300 es
+            precision highp float;
+            in vec2 vUv;
+            out vec4 fragColor;
+
+            uniform sampler2D uTexture;
+            uniform sampler2D uIconAtlas;
+            uniform vec2 uResolution;
+            uniform vec2 uMediaResolution;
+            uniform float uPixelSize;
+            uniform float uPixelGap;
+            uniform float uCornerRadius;
+            uniform int uMode; // 0: Single Shape, 1: Greyscale Ramp
+            uniform int uShape; // Active primary shape
+            uniform int uRampShapes[5]; // Shapes for 5 tonal brackets
+            uniform int uRampDriver; // 0: Luminance, 1: Saturation
+            uniform int uInvertRamp;
+            uniform int uGridType; // 0: Orthogonal, 1: Brick, 2: Hex
+            uniform float uAspect;
+            uniform float uRotation;
+            uniform float uSaturation;
+            uniform float uContrast;
+            uniform float uBrightness;
+            uniform int uSizeDriver; // 0: Uniform, 1: Luminance, 2: Saturation
+            uniform float uMinScale;
+            uniform float uMaxScale;
+            uniform int uInvertSize;
+            uniform float uScanlines;
+            uniform vec3 uBgColor;
+            uniform int uFitMode; // 0: Contain, 1: Cover, 2: Stretch
+            uniform float uImageZoom;
+            uniform vec2 uImagePan;
+            uniform int uFilterMode; // 0: Natural, 1: Cyberpunk, 2: Amber, 3: DMG
+
+            // 5-Point Star Signed Distance Function
+            float sdStar5(vec2 p, float r, float rf) {
+                const vec2 k1 = vec2(0.809016994375, -0.587785252292);
+                p.x = abs(p.x);
+                p -= 2.0 * max(dot(k1, p), 0.0) * k1;
+                p -= 2.0 * max(dot(vec2(-k1.x, k1.y), p), 0.0) * vec2(-k1.x, k1.y);
+                p.x = abs(p.x);
+                p.y -= r;
+                vec2 ba = rf * vec2(-k1.y, k1.x) - vec2(0.0, 1.0);
+                float h = clamp(dot(p, ba) / dot(ba, ba), 0.0, r);
+                return length(p - ba * h) * sign(p.y * ba.x - p.x * ba.y);
+            }
+
+            // 4-Point Star / Sparkle
+            float sdStar4(vec2 p, float r, float rf) {
+                p = abs(p);
+                vec2 ba = rf * vec2(1.0, 1.0) - vec2(0.0, r);
+                float h = clamp(dot(p - vec2(0.0, r), ba) / dot(ba, ba), 0.0, 1.0);
+                return length(p - vec2(0.0, r) - ba * h) * sign(p.x * ba.y - p.y * ba.x);
+            }
+
+            // Heart SDF
+            float sdHeart(vec2 p, float r) {
+                p.x = abs(p.x);
+                p.y = -p.y + 0.2 * r;
+                if (p.y + p.x > r) {
+                    vec2 d = p - vec2(0.25 * r, 0.75 * r);
+                    return length(d) - 0.35 * r;
+                }
+                return max(p.x + p.y - r, -p.y - 0.25 * r);
+            }
+
+            // Equilateral Triangle SDF
+            float sdTriangle(vec2 p, float r) {
+                const float k = 1.7320508; // sqrt(3)
+                p.x = abs(p.x) - r;
+                p.y = p.y + r / k;
+                if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) * 0.5;
+                p.x -= clamp(p.x, -2.0 * r, 0.0);
+                return -length(p) * sign(p.y);
+            }
+
+            float getShapeSDF(vec2 p, int shape, float r, float cr) {
+                if (shape == 0) { // Square
+                    vec2 d = abs(p) - r;
+                    return max(d.x, d.y);
+                }
+                if (shape == 1) { // Rounded Square
+                    float c = min(cr * r, r * 0.95);
+                    vec2 d = abs(p) - (r - c);
+                    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - c;
+                }
+                if (shape == 2) { // Circle
+                    return length(p) - r;
+                }
+                if (shape == 3) { // 5-Point Star
+                    return sdStar5(p, r, 0.52);
+                }
+                if (shape == 4) { // 4-Point Star
+                    return sdStar4(p, r, 0.38);
+                }
+                if (shape == 5) { // Diamond
+                    return (abs(p.x) + abs(p.y)) * 0.70710678 - r;
+                }
+                if (shape == 6) { // Cross
+                    vec2 d = abs(p);
+                    float th = r * 0.38;
+                    return min(max(d.x - r, d.y - th), max(d.x - th, d.y - r));
+                }
+                if (shape == 7) { // Heart
+                    return sdHeart(p, r);
+                }
+                if (shape == 8) { // Triangle
+                    return sdTriangle(p, r * 1.15);
+                }
+                if (shape == 9) { // Ring / Donut
+                    return abs(length(p) - r * 0.72) - r * 0.28;
+                }
+                if (shape == 11) { // Empty / None
+                    return 999.0;
+                }
+                return length(p) - r;
+            }
+
+            void main() {
+                vec2 pixelCoord = gl_FragCoord.xy;
+                float P = max(uPixelSize, 3.0);
+
+                // Grid cell indexing & local coordinates
+                vec2 cellIndex;
+                vec2 local;
+                vec2 cellCenter;
+
+                if (uGridType == 1) { // Brick
+                    float row = floor(pixelCoord.y / P);
+                    float shift = mod(row, 2.0) * 0.5 * P;
+                    float col = floor((pixelCoord.x + shift) / P);
+                    cellCenter = vec2(col * P - shift + 0.5 * P, (row + 0.5) * P);
+                    cellIndex = vec2(col, row);
+                    local = (pixelCoord - cellCenter) / P;
+                } else if (uGridType == 2) { // Hexagonal Honeycomb
+                    float yStep = P * 0.8660254; // P * sqrt(3)/2
+                    float row = floor(pixelCoord.y / yStep);
+                    float shift = mod(row, 2.0) * 0.5 * P;
+                    float col = floor((pixelCoord.x + shift) / P);
+                    cellCenter = vec2(col * P - shift + 0.5 * P, (row + 0.5) * yStep);
+                    cellIndex = vec2(col, row);
+                    local = (pixelCoord - cellCenter) / P;
+                } else { // Standard Orthogonal
+                    cellIndex = floor(pixelCoord / P);
+                    cellCenter = (cellIndex + 0.5) * P;
+                    local = (pixelCoord - cellCenter) / P;
+                }
+
+                // ==========================================
+                // IMAGE SCALING, CROPPING & PANNING
+                // ==========================================
+                float screenAspect = uResolution.x / uResolution.y;
+                float mediaAspect = uMediaResolution.x / uMediaResolution.y;
+                vec2 normCoord = (cellCenter / uResolution) - 0.5;
+
+                vec2 uvScale = vec2(1.0);
+                if (uFitMode == 0) { // Contain (Fit whole image)
+                    uvScale = (screenAspect > mediaAspect)
+                        ? vec2(screenAspect / mediaAspect, 1.0)
+                        : vec2(1.0, mediaAspect / screenAspect);
+                } else if (uFitMode == 1) { // Cover (Fill & Crop)
+                    uvScale = (screenAspect > mediaAspect)
+                        ? vec2(1.0, mediaAspect / screenAspect)
+                        : vec2(screenAspect / mediaAspect, 1.0);
+                } else { // Stretch
+                    uvScale = vec2(1.0);
+                }
+
+                // Apply manual zoom & pan
+                uvScale /= max(uImageZoom, 0.1);
+                vec2 sampleUv = normCoord * uvScale - uImagePan + 0.5;
+                sampleUv.y = 1.0 - sampleUv.y; // Flip Y for WebGL texture
+
+                if (sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0) {
+                    fragColor = vec4(uBgColor, 1.0);
+                    return;
+                }
+
+                vec4 texColor = texture(uTexture, sampleUv);
+                vec3 col = texColor.rgb;
+
+                // Color Controls
+                float lum = dot(col, vec3(0.299, 0.587, 0.114));
+                col = mix(vec3(lum), col, uSaturation);
+                col = clamp((col - 0.5) * uContrast + 0.5 + uBrightness, 0.0, 1.0);
+
+                // Palette Filters
+                if (uFilterMode == 1) { // Cyberpunk
+                    col = mix(vec3(0.0, col.g * 1.2, col.b * 1.5), vec3(col.r * 1.6, 0.1, col.b * 1.4), step(0.5, col.r));
+                } else if (uFilterMode == 2) { // Amber CRT
+                    col = vec3(lum * 1.2, lum * 0.75, lum * 0.2);
+                } else if (uFilterMode == 3) { // DMG GameBoy
+                    float q = floor(lum * 3.99) / 3.0;
+                    vec3 c0 = vec3(0.06, 0.22, 0.06);
+                    vec3 c1 = vec3(0.19, 0.38, 0.19);
+                    vec3 c2 = vec3(0.55, 0.67, 0.06);
+                    vec3 c3 = vec3(0.61, 0.73, 0.06);
+                    col = (q < 0.3) ? c0 : ((q < 0.6) ? c1 : ((q < 0.9) ? c2 : c3));
+                }
+
+                // Metric calculation
+                float maxC = max(max(col.r, col.g), col.b);
+                float minC = min(min(col.r, col.g), col.b);
+                float sat = (maxC > 0.001) ? (maxC - minC) / maxC : 0.0;
+                float currentLum = dot(col, vec3(0.299, 0.587, 0.114));
+
+                // ==========================================
+                // 2 MODES: SINGLE SHAPE vs GREYSCALE RAMP
+                // ==========================================
+                int activeShape = uShape;
+                int customSlot = -1; // -1: use procedural SDF, 0..5: use custom icon atlas
+
+                if (uMode == 0) {
+                    // MODE 0: Single Shape
+                    activeShape = uShape;
+                    if (uShape >= 12) customSlot = 0; // Single custom slot
+                } else {
+                    // MODE 1: Greyscale Tonal Shape Ramp
+                    float metric = (uRampDriver == 1) ? sat : currentLum;
+                    if (uInvertRamp == 1) metric = 1.0 - metric;
+                    int idx = clamp(int(metric * 5.0), 0, 4);
+                    if (idx == 0) activeShape = uRampShapes[0];
+                    else if (idx == 1) activeShape = uRampShapes[1];
+                    else if (idx == 2) activeShape = uRampShapes[2];
+                    else if (idx == 3) activeShape = uRampShapes[3];
+                    else activeShape = uRampShapes[4];
+
+                    if (activeShape >= 12) {
+                        customSlot = 1 + idx; // Ramp custom slots 1..5
+                    }
+                }
+
+                // Dynamic Scale by Saturation or Luminance
+                float driverMetric = 1.0;
+                if (uSizeDriver == 1) driverMetric = currentLum;
+                else if (uSizeDriver == 2) driverMetric = sat;
+                if (uInvertSize == 1) driverMetric = 1.0 - driverMetric;
+
+                float dynamicScale = mix(uMinScale, uMaxScale, driverMetric);
+                float baseR = 0.5 * (1.0 - uPixelGap) * dynamicScale;
+
+                // Cell Rotation
+                vec2 rotLocal = local;
+                rotLocal.x *= uAspect;
+                if (abs(uRotation) > 0.001) {
+                    float c = cos(uRotation), s = sin(uRotation);
+                    rotLocal = mat2(c, -s, s, c) * rotLocal;
+                }
+
+                // CUSTOM ICON / EMOJI ATLAS SAMPLING
+                if (customSlot >= 0) {
+                    float atlasSlots = 6.0;
+                    vec2 uvInSlot = rotLocal / max(dynamicScale * (1.0 - uPixelGap), 0.1);
+                    float alpha = 0.0;
+                    if (abs(uvInSlot.x) <= 0.48 && abs(uvInSlot.y) <= 0.48) {
+                        vec2 atlasUv = vec2((float(customSlot) + uvInSlot.x + 0.5) / atlasSlots, 0.5 - uvInSlot.y);
+                        vec4 atlasSamp = texture(uIconAtlas, atlasUv);
+                        alpha = max(atlasSamp.a, atlasSamp.r);
+                    }
+                    fragColor = vec4(mix(uBgColor, col, alpha), 1.0);
+                    return;
+                }
+
+                // Render RGB Subpixel Stripe (LCD Matrix mode: Shape 10)
+                if (activeShape == 10) {
+                    float subCol = floor((local.x + 0.5) * 3.0);
+                    subCol = clamp(subCol, 0.0, 2.0);
+                    float subCenterX = (subCol + 0.5) / 3.0 - 0.5;
+                    vec2 subLocal = vec2((local.x - subCenterX) * 3.0, local.y * 2.0);
+
+                    vec2 dSub = abs(subLocal) - vec2(0.35 * (1.0 - uPixelGap), 0.78 * (1.0 - uPixelGap));
+                    float dPill = length(max(dSub, 0.0)) + min(max(dSub.x, dSub.y), 0.0) - 0.2;
+                    float subAlpha = smoothstep(0.04, -0.04, dPill);
+
+                    vec3 phosphorColor = vec3(0.0);
+                    if (subCol < 0.5) phosphorColor = vec3(col.r * 1.3, 0.0, 0.0);
+                    else if (subCol < 1.5) phosphorColor = vec3(0.0, col.g * 1.3, 0.0);
+                    else phosphorColor = vec3(0.0, 0.0, col.b * 1.4);
+
+                    vec3 finalRgb = mix(uBgColor, phosphorColor, subAlpha);
+                    fragColor = vec4(finalRgb, 1.0);
+                    return;
+                }
+
+                // Calculate Vector SDF (100% Flat 2D rendering)
+                float dist = getShapeSDF(rotLocal, activeShape, baseR, uCornerRadius);
+                float aa = fwidth(dist) * 1.2;
+                float alpha = smoothstep(aa, -aa, dist);
+
+                vec3 finalCol = col;
+
+                // Flat grid separation lines (optional)
+                if (uScanlines > 0.001) {
+                    float gridWire = clamp(abs(local.x) * 2.0, 0.0, 1.0) * clamp(abs(local.y) * 2.0, 0.0, 1.0);
+                    finalCol *= (1.0 - uScanlines * 0.35 * gridWire);
+                }
+
+                fragColor = vec4(mix(uBgColor, finalCol, alpha), 1.0);
+            }
+        `;
+
+        function compileShader(gl, source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        const vertShader = compileShader(gl, vsSource, gl.VERTEX_SHADER);
+        const fragShader = compileShader(gl, fsSource, gl.FRAGMENT_SHADER);
+        const program = gl.createProgram();
+        gl.attachShader(program, vertShader);
+        gl.attachShader(program, fragShader);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('Program link error:', gl.getProgramInfoLog(program));
+        }
+
+        // Quad buffer
+        const quadBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+            -1, -1,
+             1, -1,
+            -1,  1,
+            -1,  1,
+             1, -1,
+             1,  1
+        ]), gl.STATIC_DRAW);
+
+        const aPositionLoc = gl.getAttribLocation(program, 'aPosition');
+        gl.enableVertexAttribArray(aPositionLoc);
+        gl.vertexAttribPointer(aPositionLoc, 2, gl.FLOAT, false, 0, 0);
+
+        // Uniforms
+        const uniforms = {
+            uTexture: gl.getUniformLocation(program, 'uTexture'),
+            uIconAtlas: gl.getUniformLocation(program, 'uIconAtlas'),
+            uResolution: gl.getUniformLocation(program, 'uResolution'),
+            uMediaResolution: gl.getUniformLocation(program, 'uMediaResolution'),
+            uPixelSize: gl.getUniformLocation(program, 'uPixelSize'),
+            uPixelGap: gl.getUniformLocation(program, 'uPixelGap'),
+            uCornerRadius: gl.getUniformLocation(program, 'uCornerRadius'),
+            uMode: gl.getUniformLocation(program, 'uMode'),
+            uShape: gl.getUniformLocation(program, 'uShape'),
+            uRampShapes: gl.getUniformLocation(program, 'uRampShapes'),
+            uRampDriver: gl.getUniformLocation(program, 'uRampDriver'),
+            uInvertRamp: gl.getUniformLocation(program, 'uInvertRamp'),
+            uGridType: gl.getUniformLocation(program, 'uGridType'),
+            uAspect: gl.getUniformLocation(program, 'uAspect'),
+            uRotation: gl.getUniformLocation(program, 'uRotation'),
+            uSaturation: gl.getUniformLocation(program, 'uSaturation'),
+            uContrast: gl.getUniformLocation(program, 'uContrast'),
+            uBrightness: gl.getUniformLocation(program, 'uBrightness'),
+            uSizeDriver: gl.getUniformLocation(program, 'uSizeDriver'),
+            uMinScale: gl.getUniformLocation(program, 'uMinScale'),
+            uMaxScale: gl.getUniformLocation(program, 'uMaxScale'),
+            uInvertSize: gl.getUniformLocation(program, 'uInvertSize'),
+            uScanlines: gl.getUniformLocation(program, 'uScanlines'),
+            uBgColor: gl.getUniformLocation(program, 'uBgColor'),
+            uFitMode: gl.getUniformLocation(program, 'uFitMode'),
+            uImageZoom: gl.getUniformLocation(program, 'uImageZoom'),
+            uImagePan: gl.getUniformLocation(program, 'uImagePan'),
+            uFilterMode: gl.getUniformLocation(program, 'uFilterMode')
+        };
+
+        // Textures
+        const mediaTexture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, mediaTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        const iconAtlasTexture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, iconAtlasTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        // ==========================================
+        // APP STATE
+        // ==========================================
+        const state = {
+            mode: 0, // 0: Single Shape, 1: Greyscale Ramp
+            shape: 3, // Default: 5-Star
+            rampShapes: [11, 6, 2, 3, 0], // Default: Empty, Cross, Circle, 5-Star, Square
+            rampDriver: 0, // 0: Luminance, 1: Saturation
+            invertRamp: false,
+            // Custom Icons/Glyphs: Slot 0 = Single Custom, Slots 1..5 = Ramp L1..L5
+            customIcons: ['✦', '·', '✦', '★', '✿', '■'],
+            customImages: [null, null, null, null, null, null],
+            pixelSize: 28,
+            pixelGap: 0.15,
+            cornerRadius: 0.4,
+            rotation: 0,
+            autoSpin: false,
+            spinAngle: 0,
+            saturation: 1.8,
+            contrast: 1.15,
+            brightness: 0.0,
+            sizeDriver: 0, // Uniform by default
+            minScale: 0.35,
+            maxScale: 1.0,
+            invertSize: false,
+            gridType: 0,
+            aspect: 1.0,
+            fitMode: 0, // 0: Contain, 1: Cover, 2: Stretch
+            imageZoom: 1.0,
+            imagePanX: 0.0,
+            imagePanY: 0.0,
+            filterMode: 0,
+            scanlines: 0.0,
+            bgColor: [0.024, 0.027, 0.039],
+            mediaType: 'demo',
+            mediaWidth: 800,
+            mediaHeight: 800,
+            demoIndex: 0,
+            loopMedia: true,
+            playbackRate: 1.0,
+            gifFrames: [],
+            gifCurrentFrame: 0,
+            gifFrameTimer: 0,
+            gifTotalDuration: 0,
+            gifPlaying: true,
+            gifFallbackImg: null
+        };
+
+        // DOM Elements
+        const dropOverlay = document.getElementById('drop-overlay');
+        const filePicker = document.getElementById('filePicker');
+        const openFileBtn = document.getElementById('openFileBtn');
+        const demoCycleBtn = document.getElementById('demoCycleBtn');
+        const snapshotBtn = document.getElementById('snapshotBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const videoTransport = document.getElementById('video-transport');
+        const hiddenVideo = document.getElementById('hiddenVideo');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const videoScrub = document.getElementById('videoScrub');
+        const videoTime = document.getElementById('videoTime');
+        const loopToggleBtn = document.getElementById('loopToggleBtn');
+        const presetSelect = document.getElementById('preset-select');
+        const btnAutoSpin = document.getElementById('btnAutoSpin');
+        const btnInvertSize = document.getElementById('btnInvertSize');
+        const btnInvertRamp = document.getElementById('btnInvertRamp');
+        const modeBadge = document.getElementById('modeBadge');
+        const canvasSizeBadge = document.getElementById('canvasSizeBadge');
+
+        // Sidebar Playback & Looping Elements
+        const mediaPlaybackHeader = document.getElementById('mediaPlaybackHeader');
+        const mediaPlaybackSection = document.getElementById('mediaPlaybackSection');
+        const mediaTypeBadge = document.getElementById('mediaTypeBadge');
+        const sidePlayPauseBtn = document.getElementById('sidePlayPauseBtn');
+        const sideLoopBtn = document.getElementById('sideLoopBtn');
+        const sideRestartBtn = document.getElementById('sideRestartBtn');
+        const sideTimeDisplay = document.getElementById('sideTimeDisplay');
+        const sideScrub = document.getElementById('sideScrub');
+
+        const sectionSingleShape = document.getElementById('sectionSingleShape');
+        const sectionGreyscaleRamp = document.getElementById('sectionGreyscaleRamp');
+        const singleCustomBox = document.getElementById('singleCustomBox');
+        const singleCustomInput = document.getElementById('singleCustomInput');
+        const singleUploadBtn = document.getElementById('singleUploadBtn');
+        const singleFileInput = document.getElementById('singleFileInput');
+
+        const demoCanvas = document.getElementById('demoCanvas');
+        const demoCtx = demoCanvas.getContext('2d');
+        const iconAtlasCanvas = document.getElementById('iconAtlasCanvas');
+        const iconAtlasCtx = iconAtlasCanvas.getContext('2d');
+
+        // ==========================================
+        // CUSTOM ICON ATLAS GENERATOR
+        // ==========================================
+        function updateIconAtlas() {
+            const cellSize = 128;
+            const slots = 6;
+            iconAtlasCanvas.width = cellSize * slots;
+            iconAtlasCanvas.height = cellSize;
+
+            iconAtlasCtx.clearRect(0, 0, iconAtlasCanvas.width, iconAtlasCanvas.height);
+
+            for (let i = 0; i < slots; i++) {
+                const cx = i * cellSize + cellSize / 2;
+                const cy = cellSize / 2;
+
+                if (state.customImages[i]) {
+                    // Draw uploaded custom PNG/SVG
+                    const img = state.customImages[i];
+                    const pad = 12;
+                    iconAtlasCtx.drawImage(img, i * cellSize + pad, pad, cellSize - pad * 2, cellSize - pad * 2);
+                } else {
+                    // Draw custom text/emoji/glyph
+                    const text = state.customIcons[i] || ' ';
+                    iconAtlasCtx.fillStyle = '#ffffff';
+                    iconAtlasCtx.font = 'bold 84px "Google Sans Mono", sans-serif';
+                    iconAtlasCtx.textAlign = 'center';
+                    iconAtlasCtx.textBaseline = 'middle';
+                    iconAtlasCtx.fillText(text, cx, cy);
+                }
+            }
+
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, iconAtlasTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, iconAtlasCanvas);
+        }
+
+        // ==========================================
+        // PROCEDURAL DEMO GENERATOR
+        // ==========================================
+        let demoAnimTime = 0;
+        function updateDemoCanvas() {
+            demoAnimTime += 0.025;
+            const w = demoCanvas.width;
+            const h = demoCanvas.height;
+
+            if (state.demoIndex === 0) {
+                // Demo 1: Chromatic Starface Galaxy
+                demoCtx.fillStyle = '#0a0b12';
+                demoCtx.fillRect(0, 0, w, h);
+
+                const gradBg = demoCtx.createRadialGradient(w/2, h/2, 50, w/2, h/2, 380);
+                gradBg.addColorStop(0, 'rgba(80, 85, 105, 0.4)');
+                gradBg.addColorStop(1, 'rgba(10, 11, 18, 1)');
+                demoCtx.fillStyle = gradBg;
+                demoCtx.fillRect(0, 0, w, h);
+
+                for (let i = 0; i < 5; i++) {
+                    const angle = demoAnimTime * 0.8 + i * (Math.PI * 2 / 5);
+                    const dist = 140 + Math.sin(demoAnimTime * 1.5 + i) * 60;
+                    const cx = w/2 + Math.cos(angle) * dist;
+                    const cy = h/2 + Math.sin(angle) * dist;
+                    const radius = 90 + Math.cos(demoAnimTime + i) * 30;
+
+                    const hue = (i * 65 + demoAnimTime * 20) % 360;
+                    const grad = demoCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                    grad.addColorStop(0, `hsla(${hue}, 100%, 65%, 1)`);
+                    grad.addColorStop(0.6, `hsla(${hue}, 95%, 50%, 0.8)`);
+                    grad.addColorStop(1, `hsla(${hue}, 90%, 40%, 0)`);
+
+                    demoCtx.fillStyle = grad;
+                    demoCtx.beginPath();
+                    demoCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+                    demoCtx.fill();
+                }
+
+                const centerGrad = demoCtx.createRadialGradient(w/2, h/2, 0, w/2, h/2, 120);
+                centerGrad.addColorStop(0, '#ffffff');
+                centerGrad.addColorStop(0.3, '#ff2a85');
+                centerGrad.addColorStop(0.8, '#7000ff');
+                centerGrad.addColorStop(1, 'transparent');
+                demoCtx.fillStyle = centerGrad;
+                demoCtx.beginPath();
+                demoCtx.arc(w/2, h/2, 120, 0, Math.PI * 2);
+                demoCtx.fill();
+
+            } else if (state.demoIndex === 1) {
+                // Demo 2: Cyberpunk Neon Lines & Geometric Shapes
+                demoCtx.fillStyle = '#05070f';
+                demoCtx.fillRect(0, 0, w, h);
+
+                demoCtx.strokeStyle = 'rgba(0, 240, 255, 0.15)';
+                demoCtx.lineWidth = 2;
+                for (let x = 0; x < w; x += 40) {
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(x, 0);
+                    demoCtx.lineTo(x, h);
+                    demoCtx.stroke();
+                }
+                for (let y = 0; y < h; y += 40) {
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(0, y);
+                    demoCtx.lineTo(w, y);
+                    demoCtx.stroke();
+                }
+
+                demoCtx.save();
+                demoCtx.translate(w/2, h/2);
+                demoCtx.rotate(demoAnimTime * 0.5);
+
+                demoCtx.lineWidth = 14;
+                demoCtx.strokeStyle = '#ff0077';
+                demoCtx.strokeRect(-120, -120, 240, 240);
+
+                demoCtx.rotate(-demoAnimTime * 1.2);
+                demoCtx.lineWidth = 10;
+                demoCtx.strokeStyle = '#00f0ff';
+                demoCtx.beginPath();
+                demoCtx.arc(0, 0, 160, 0, Math.PI * 2);
+                demoCtx.stroke();
+
+                demoCtx.restore();
+
+            } else {
+                // Demo 3: Rainbow Color Wheel Test Pattern
+                demoCtx.fillStyle = '#111';
+                demoCtx.fillRect(0, 0, w, h);
+
+                const numRays = 36;
+                for (let i = 0; i < numRays; i++) {
+                    const startAngle = (i / numRays) * Math.PI * 2 + demoAnimTime * 0.3;
+                    const endAngle = ((i + 1) / numRays) * Math.PI * 2 + demoAnimTime * 0.3;
+                    const hue = (i / numRays) * 360;
+
+                    demoCtx.fillStyle = `hsl(${hue}, 100%, 55%)`;
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(w/2, h/2);
+                    demoCtx.arc(w/2, h/2, 320, startAngle, endAngle);
+                    demoCtx.closePath();
+                    demoCtx.fill();
+                }
+
+                const centerMask = demoCtx.createRadialGradient(w/2, h/2, 0, w/2, h/2, 180);
+                centerMask.addColorStop(0, 'rgba(210, 210, 220, 1)');
+                centerMask.addColorStop(0.7, 'rgba(180, 180, 190, 0.9)');
+                centerMask.addColorStop(1, 'rgba(120, 120, 130, 0)');
+                demoCtx.fillStyle = centerMask;
+                demoCtx.beginPath();
+                demoCtx.arc(w/2, h/2, 180, 0, Math.PI * 2);
+                demoCtx.fill();
+            }
+        }
+
+        // ==========================================
+        // MEDIA LOADING & CANVAS AUTO-RESIZING
+        // ==========================================
+        function clearMediaResources() {
+            if (state.gifFrames && state.gifFrames.length > 0) {
+                for (const f of state.gifFrames) {
+                    if (f.bitmap && typeof f.bitmap.close === 'function') {
+                        f.bitmap.close();
+                    }
+                }
+                state.gifFrames = [];
+            }
+            state.gifFallbackImg = null;
+            if (hiddenVideo.src && hiddenVideo.src.startsWith('blob:')) {
+                URL.revokeObjectURL(hiddenVideo.src);
+            }
+        }
+
+        function loadMediaFile(file) {
+            if (!file) return;
+
+            const name = (file.name || '').toLowerCase();
+            const isGif = file.type === 'image/gif' || name.endsWith('.gif');
+            const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(name);
+
+            if (isGif) {
+                loadGifFile(file);
+            } else if (isVideo) {
+                loadVideoFile(file);
+            } else if (file.type.startsWith('image/')) {
+                loadImageFile(file);
+            }
+        }
+
+        async function loadGifFile(file) {
+            clearMediaResources();
+            hiddenVideo.pause();
+
+            // Try modern WebCodecs ImageDecoder first (native to Chromium/VS Code & Safari)
+            if ('ImageDecoder' in window) {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const decoder = new ImageDecoder({ data: arrayBuffer, type: 'image/gif' });
+                    await decoder.tracks.ready;
+                    const track = decoder.tracks.selectedTrack;
+                    const frameCount = track.frameCount;
+
+                    // Decode first frame immediately for instant response
+                    const firstResult = await decoder.decode({ frameIndex: 0 });
+                    const firstBmp = await createImageBitmap(firstResult.image);
+                    const w = firstBmp.width;
+                    const h = firstBmp.height;
+                    const firstDur = (firstResult.image.duration || 100000) / 1000000;
+                    firstResult.image.close();
+
+                    state.mediaType = 'gif';
+                    state.mediaWidth = w;
+                    state.mediaHeight = h;
+                    state.gifFrames = [{ bitmap: firstBmp, duration: firstDur }];
+                    state.gifCurrentFrame = 0;
+                    state.gifFrameTimer = 0;
+                    state.gifTotalDuration = firstDur;
+                    state.gifPlaying = true;
+
+                    updateTexture(firstBmp);
+                    resizeCanvas();
+                    showMediaControls(true, 'ANIMATED GIF');
+                    updatePlayPauseUI(true);
+
+                    // Decode subsequent frames in background
+                    if (frameCount > 1) {
+                        (async () => {
+                            let totalDur = firstDur;
+                            for (let i = 1; i < frameCount; i++) {
+                                try {
+                                    const res = await decoder.decode({ frameIndex: i });
+                                    const bmp = await createImageBitmap(res.image);
+                                    const dur = (res.image.duration || 100000) / 1000000;
+                                    res.image.close();
+                                    state.gifFrames.push({ bitmap: bmp, duration: dur });
+                                    totalDur += dur;
+                                    state.gifTotalDuration = totalDur;
+                                } catch (err) {
+                                    console.warn('Decode frame error at', i, err);
+                                    break;
+                                }
+                            }
+                        })();
+                    }
+                    return;
+                } catch (e) {
+                    console.warn('ImageDecoder failed, using animated <img> fallback:', e);
+                }
+            }
+
+            // Fallback for environments without ImageDecoder
+            loadGifFallback(file);
+        }
+
+        function loadGifFallback(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const gifImg = new Image();
+                gifImg.onload = function() {
+                    state.mediaType = 'gif_fallback';
+                    state.mediaWidth = gifImg.naturalWidth || gifImg.width;
+                    state.mediaHeight = gifImg.naturalHeight || gifImg.height;
+                    state.gifFallbackImg = gifImg;
+                    state.gifPlaying = true;
+                    resizeCanvas();
+                    showMediaControls(true, 'ANIMATED GIF');
+                    updatePlayPauseUI(true);
+                };
+                gifImg.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function loadVideoFile(file) {
+            clearMediaResources();
+            const url = URL.createObjectURL(file);
+            hiddenVideo.src = url;
+            hiddenVideo.loop = state.loopMedia;
+            hiddenVideo.playbackRate = state.playbackRate;
+
+            hiddenVideo.onloadedmetadata = function() {
+                state.mediaType = 'video';
+                state.mediaWidth = hiddenVideo.videoWidth;
+                state.mediaHeight = hiddenVideo.videoHeight;
+                showMediaControls(true, 'MP4 VIDEO');
+                hiddenVideo.play().catch(e => console.log('Autoplay:', e));
+                updatePlayPauseUI(true);
+                resizeCanvas();
+            };
+
+            hiddenVideo.onended = function() {
+                if (state.loopMedia) {
+                    hiddenVideo.currentTime = 0;
+                    hiddenVideo.play().catch(() => {});
+                } else {
+                    updatePlayPauseUI(false);
+                }
+            };
+        }
+
+        function loadImageFile(file) {
+            clearMediaResources();
+            hiddenVideo.pause();
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    state.mediaType = 'image';
+                    state.mediaWidth = img.naturalWidth || img.width;
+                    state.mediaHeight = img.naturalHeight || img.height;
+                    showMediaControls(false, 'STATIC IMAGE');
+                    updateTexture(img);
+                    resizeCanvas();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateTexture(source) {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, mediaTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+        }
+
+        function showMediaControls(visible, label) {
+            if (visible) {
+                videoTransport.classList.remove('hidden');
+                if (mediaPlaybackHeader) mediaPlaybackHeader.style.display = 'flex';
+                if (mediaPlaybackSection) mediaPlaybackSection.style.display = 'block';
+                if (mediaTypeBadge) mediaTypeBadge.textContent = label;
+            } else {
+                videoTransport.classList.add('hidden');
+                if (mediaPlaybackHeader) mediaPlaybackHeader.style.display = 'none';
+                if (mediaPlaybackSection) mediaPlaybackSection.style.display = 'none';
+            }
+        }
+
+        function updatePlayPauseUI(isPlaying) {
+            if (isPlaying) {
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+                if (sidePlayPauseBtn) sidePlayPauseBtn.textContent = '⏸ Pause';
+            } else {
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+                if (sidePlayPauseBtn) sidePlayPauseBtn.textContent = '▶ Play';
+            }
+        }
+
+        function togglePlayPause() {
+            if (state.mediaType === 'video') {
+                if (hiddenVideo.paused) {
+                    hiddenVideo.play();
+                    updatePlayPauseUI(true);
+                } else {
+                    hiddenVideo.pause();
+                    updatePlayPauseUI(false);
+                }
+            } else if (state.mediaType === 'gif') {
+                state.gifPlaying = !state.gifPlaying;
+                updatePlayPauseUI(state.gifPlaying);
+            }
+        }
+
+        function setLoop(enable) {
+            state.loopMedia = enable;
+            hiddenVideo.loop = enable;
+
+            if (loopToggleBtn) {
+                loopToggleBtn.textContent = 'Loop: ' + (enable ? 'ON' : 'OFF');
+                loopToggleBtn.classList.toggle('active', enable);
+            }
+            if (sideLoopBtn) {
+                sideLoopBtn.textContent = 'Loop: ' + (enable ? 'ON' : 'OFF');
+                sideLoopBtn.classList.toggle('active', enable);
+            }
+        }
+
+        function restartMedia() {
+            if (state.mediaType === 'video') {
+                hiddenVideo.currentTime = 0;
+                hiddenVideo.play().catch(() => {});
+                updatePlayPauseUI(true);
+                updateTexture(hiddenVideo);
+            } else if (state.mediaType === 'gif') {
+                state.gifCurrentFrame = 0;
+                state.gifFrameTimer = 0;
+                state.gifPlaying = true;
+                updatePlayPauseUI(true);
+                if (state.gifFrames && state.gifFrames[0]?.bitmap) {
+                    updateTexture(state.gifFrames[0].bitmap);
+                }
+            }
+        }
+
+        function setPlaybackSpeed(spd) {
+            state.playbackRate = spd;
+            hiddenVideo.playbackRate = spd;
+            document.querySelectorAll('#speedCluster button').forEach(b => {
+                b.classList.toggle('active', parseFloat(b.dataset.speed) === spd);
+            });
+        }
+
+        function seekMedia(percent) {
+            if (state.mediaType === 'video') {
+                if (hiddenVideo.duration) {
+                    hiddenVideo.currentTime = (percent / 100) * hiddenVideo.duration;
+                    updateTexture(hiddenVideo);
+                }
+            } else if (state.mediaType === 'gif') {
+                if (state.gifFrames && state.gifFrames.length > 0) {
+                    const idx = Math.min(
+                        Math.floor((percent / 100) * state.gifFrames.length),
+                        state.gifFrames.length - 1
+                    );
+                    state.gifCurrentFrame = idx;
+                    state.gifFrameTimer = 0;
+                    if (state.gifFrames[idx]?.bitmap) {
+                        updateTexture(state.gifFrames[idx].bitmap);
+                    }
+                }
+            }
+            videoScrub.value = percent;
+            if (sideScrub) sideScrub.value = percent;
+        }
+
+        function formatTime(s) {
+            if (isNaN(s) || s < 0) s = 0;
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        // Drag & Drop
+        window.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.add('active');
+        });
+
+        window.addEventListener('dragleave', (e) => {
+            if (e.relatedTarget === null || e.clientY <= 0) {
+                dropOverlay.classList.remove('active');
+            }
+        });
+
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.remove('active');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                loadMediaFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Clipboard Paste
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let item of items) {
+                if (item.kind === 'file') {
+                    const blob = item.getAsFile();
+                    if (blob) {
+                        loadMediaFile(blob);
+                        break;
+                    }
+                }
+            }
+        });
+
+        openFileBtn.onclick = () => filePicker.click();
+        filePicker.onchange = (e) => {
+            if (e.target.files.length > 0) {
+                loadMediaFile(e.target.files[0]);
+            }
+        };
+
+        demoCycleBtn.onclick = () => {
+            clearMediaResources();
+            state.mediaType = 'demo';
+            state.demoIndex = (state.demoIndex + 1) % 3;
+            state.mediaWidth = 800;
+            state.mediaHeight = 800;
+            showMediaControls(false, 'DEMO');
+            hiddenVideo.pause();
+            resizeCanvas();
+        };
+
+        // Playback & Looping Handlers
+        playPauseBtn.onclick = togglePlayPause;
+        if (sidePlayPauseBtn) sidePlayPauseBtn.onclick = togglePlayPause;
+
+        loopToggleBtn.onclick = () => setLoop(!state.loopMedia);
+        if (sideLoopBtn) sideLoopBtn.onclick = () => setLoop(!state.loopMedia);
+
+        if (sideRestartBtn) sideRestartBtn.onclick = restartMedia;
+
+        videoScrub.oninput = (e) => seekMedia(parseFloat(e.target.value));
+        if (sideScrub) sideScrub.oninput = (e) => seekMedia(parseFloat(e.target.value));
+
+        document.querySelectorAll('#speedCluster button').forEach(btn => {
+            btn.onclick = () => setPlaybackSpeed(parseFloat(btn.dataset.speed));
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && (state.mediaType === 'video' || state.mediaType === 'gif') && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                togglePlayPause();
+            }
+        });
+
+        // Snapshot PNG Export
+        snapshotBtn.onclick = () => {
+            renderFrame();
+            const link = document.createElement('a');
+            link.download = `pixel_art_${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+
+        // Media Recorder for WebM Export
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        recordBtn.onclick = () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        };
+
+        function startRecording() {
+            recordedChunks = [];
+            const stream = canvas.captureStream(60);
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+            mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10000000 });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `pixel_animation_${Date.now()}.webm`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            recordBtn.classList.add('btn-recording');
+            recordBtn.textContent = 'Stop Recording';
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('btn-recording');
+                recordBtn.textContent = 'Record WebM';
+            }
+        }
+
+        // ==========================================
+        // UI BINDINGS: ONLY 2 MODES
+        // ==========================================
+        function setMode(mode) {
+            state.mode = mode;
+            document.querySelectorAll('#modeGroup button').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.mode) === mode);
+            });
+
+            sectionSingleShape.style.display = (mode === 0) ? 'block' : 'none';
+            sectionGreyscaleRamp.style.display = (mode === 1) ? 'block' : 'none';
+
+            modeBadge.textContent = (mode === 0) ? 'SINGLE SHAPE' : 'GREYSCALE RAMP';
+        }
+
+        document.querySelectorAll('#modeGroup button').forEach(btn => {
+            btn.onclick = () => setMode(parseInt(btn.dataset.mode));
+        });
+
+        // Single Shape Buttons
+        document.querySelectorAll('#primaryShapeGrid button').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('#primaryShapeGrid button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.shape = parseInt(btn.dataset.shape);
+                document.getElementById('cornerRadiusGroup').style.display = (state.shape === 1) ? 'block' : 'none';
+                singleCustomBox.style.display = (state.shape >= 12) ? 'block' : 'none';
+            };
+        });
+
+        // Single Shape Custom Icon Handlers
+        singleCustomInput.onfocus = () => singleCustomInput.select();
+        singleCustomInput.oninput = (e) => {
+            state.customIcons[0] = e.target.value || ' ';
+            state.customImages[0] = null;
+            updateIconAtlas();
+        };
+
+        singleUploadBtn.onclick = () => singleFileInput.click();
+        singleFileInput.onchange = (e) => {
+            if (e.target.files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        state.customImages[0] = img;
+                        updateIconAtlas();
+                    };
+                    img.src = evt.target.result;
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        };
+
+        // Greyscale Ramp Slots Setup & Custom Icon Handlers
+        for (let i = 0; i < 5; i++) {
+            const slotIdx = i;
+            const selectEl = document.getElementById(`rampSlot${i}`);
+            const customBox = document.getElementById(`customBox${i}`);
+            const customInput = document.getElementById(`customInput${i}`);
+            const uploadBtn = customBox.querySelector('.upload-btn');
+            const fileInput = document.getElementById(`fileSlot${i}`);
+
+            selectEl.onchange = (e) => {
+                if (e.target.value === 'custom') {
+                    state.rampShapes[slotIdx] = 12 + slotIdx; // custom icon shape id
+                    customBox.style.display = 'flex';
+                } else {
+                    state.rampShapes[slotIdx] = parseInt(e.target.value);
+                    customBox.style.display = 'none';
+                }
+            };
+
+            customInput.onfocus = () => customInput.select();
+            customInput.oninput = (e) => {
+                state.customIcons[1 + slotIdx] = e.target.value || ' ';
+                state.customImages[1 + slotIdx] = null;
+                updateIconAtlas();
+            };
+
+            uploadBtn.onclick = () => fileInput.click();
+            fileInput.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            state.customImages[1 + slotIdx] = img;
+                            updateIconAtlas();
+                        };
+                        img.src = evt.target.result;
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+            };
+        }
+
+        // Ramp Presets
+        const rampPresets = {
+            cosmic: [11, 2, 4, 3, 7], // Empty, Dot, Sparkle, 5-Star, Heart
+            ascii: [11, 2, 6, 3, 0], // Empty, Dot, Cross, Star, Square
+            emojis: ['custom', 'custom', 'custom', 'custom', 'custom'],
+            minimal: [11, 5, 2, 8, 0] // Empty, Diamond, Circle, Triangle, Square
+        };
+
+        document.querySelectorAll('#rampPresets button').forEach(btn => {
+            btn.onclick = () => {
+                const rp = rampPresets[btn.dataset.ramppreset];
+                if (!rp) return;
+
+                if (btn.dataset.ramppreset === 'emojis') {
+                    state.customIcons[1] = '·';
+                    state.customIcons[2] = '✦';
+                    state.customIcons[3] = '★';
+                    state.customIcons[4] = '✿';
+                    state.customIcons[5] = '■';
+                    for (let i = 0; i < 5; i++) {
+                        state.rampShapes[i] = 12 + i;
+                        document.getElementById(`rampSlot${i}`).value = 'custom';
+                        document.getElementById(`customBox${i}`).style.display = 'flex';
+                        document.getElementById(`customInput${i}`).value = state.customIcons[1 + i];
+                    }
+                    updateIconAtlas();
+                } else {
+                    state.rampShapes = [...rp];
+                    for (let i = 0; i < 5; i++) {
+                        document.getElementById(`rampSlot${i}`).value = rp[i];
+                        document.getElementById(`customBox${i}`).style.display = 'none';
+                    }
+                }
+            };
+        });
+
+        // Invert Ramp Toggle
+        btnInvertRamp.onclick = () => {
+            state.invertRamp = !state.invertRamp;
+            btnInvertRamp.textContent = state.invertRamp ? 'On' : 'Off';
+            btnInvertRamp.classList.toggle('active', state.invertRamp);
+        };
+
+        // Ramp Driver
+        document.querySelectorAll('#rampDriverGroup button').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('#rampDriverGroup button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.rampDriver = parseInt(btn.dataset.driver);
+            };
+        });
+
+        // Sliders & Text Fields Two-Way Binding Engine
+        const sliderBindings = [];
+
+        function parsePercentInput(str, maxLimit) {
+            const clean = str.replace(/[^0-9.-]/g, '');
+            const raw = parseFloat(clean);
+            if (isNaN(raw)) return null;
+            if (Math.abs(raw) > 1.0 && maxLimit <= 1.0) {
+                return raw / 100;
+            }
+            if (raw > maxLimit && maxLimit <= 3.0) {
+                return raw / 100;
+            }
+            return raw;
+        }
+
+        function bindSlider(id, prop, valId, formatFn, parseFn) {
+            const el = document.getElementById(id);
+            const valEl = document.getElementById(valId);
+            if (!el || !valEl) return;
+
+            sliderBindings.push({ el, valEl, prop, formatFn });
+
+            // Slider drag -> updates state and text field
+            el.oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                state[prop] = val;
+                if (document.activeElement !== valEl) {
+                    valEl.value = formatFn ? formatFn(val) : val;
+                }
+            };
+
+            // Focus selects text for immediate replacement
+            valEl.onfocus = () => {
+                valEl.select();
+            };
+
+            function applyUserText(commit) {
+                const rawStr = valEl.value.trim();
+                let parsed = parseFn ? parseFn(rawStr) : parseFloat(rawStr.replace(/[^0-9.-]/g, ''));
+                if (!isNaN(parsed) && parsed !== null) {
+                    const min = parseFloat(el.min);
+                    const max = parseFloat(el.max);
+                    if (!isNaN(min) && parsed < min) parsed = min;
+                    if (!isNaN(max) && parsed > max * 2) parsed = max * 2;
+                    state[prop] = parsed;
+                    el.value = parsed;
+                }
+                if (commit) {
+                    valEl.value = formatFn ? formatFn(state[prop]) : state[prop];
+                }
+            }
+
+            valEl.oninput = () => applyUserText(false);
+            valEl.onchange = () => applyUserText(true);
+            valEl.onblur = () => applyUserText(true);
+            valEl.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    valEl.blur();
+                }
+            };
+        }
+
+        bindSlider('paramPixelSize', 'pixelSize', 'valPixelSize', 
+            v => v + 'px', 
+            s => parseFloat(s.replace(/[^0-9.-]/g, ''))
+        );
+        bindSlider('paramPixelGap', 'pixelGap', 'valPixelGap', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 0.6)
+        );
+        bindSlider('paramCornerRadius', 'cornerRadius', 'valCornerRadius', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 1.0)
+        );
+        bindSlider('paramRotation', 'rotation', 'valRotation', 
+            v => v + '°', 
+            s => parseFloat(s.replace(/[^0-9.-]/g, ''))
+        );
+        bindSlider('paramSaturation', 'saturation', 'valSaturation', 
+            v => v.toFixed(2) + 'x', 
+            s => parseFloat(s.replace(/[^0-9.-]/g, ''))
+        );
+        bindSlider('paramContrast', 'contrast', 'valContrast', 
+            v => v.toFixed(2) + 'x', 
+            s => parseFloat(s.replace(/[^0-9.-]/g, ''))
+        );
+        bindSlider('paramBrightness', 'brightness', 'valBrightness', 
+            v => v.toFixed(2), 
+            s => parseFloat(s.replace(/[^0-9.-]/g, ''))
+        );
+        bindSlider('paramMinScale', 'minScale', 'valMinScale', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 1.0)
+        );
+        bindSlider('paramMaxScale', 'maxScale', 'valMaxScale', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 1.5)
+        );
+        bindSlider('paramAspect', 'aspect', 'valAspect', 
+            v => v.toFixed(2), 
+            s => parseFloat(s.replace(/[^0-9.-]/g, ''))
+        );
+        bindSlider('paramScanlines', 'scanlines', 'valScanlines', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 1.0)
+        );
+
+        // Image Zoom & Pan Sliders
+        bindSlider('paramImageZoom', 'imageZoom', 'valImageZoom', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 3.0)
+        );
+        bindSlider('paramImagePanX', 'imagePanX', 'valImagePanX', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 1.0)
+        );
+        bindSlider('paramImagePanY', 'imagePanY', 'valImagePanY', 
+            v => Math.round(v * 100) + '%', 
+            s => parsePercentInput(s, 1.0)
+        );
+
+        // Toggle Buttons
+        btnAutoSpin.onclick = () => {
+            state.autoSpin = !state.autoSpin;
+            btnAutoSpin.textContent = state.autoSpin ? 'On' : 'Off';
+            btnAutoSpin.classList.toggle('active', state.autoSpin);
+        };
+
+        btnInvertSize.onclick = () => {
+            state.invertSize = !state.invertSize;
+            btnInvertSize.textContent = state.invertSize ? 'On' : 'Off';
+            btnInvertSize.classList.toggle('active', state.invertSize);
+        };
+
+        // Button Clusters
+        function bindCluster(groupId, prop, attr, parseFn) {
+            document.querySelectorAll(`#${groupId} button`).forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll(`#${groupId} button`).forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state[prop] = parseFn(btn.getAttribute(attr));
+                };
+            });
+        }
+
+        bindCluster('fitModeGroup', 'fitMode', 'data-fit', parseInt);
+        bindCluster('sizeDriverGroup', 'sizeDriver', 'data-driver', parseInt);
+        bindCluster('gridTypeGroup', 'gridType', 'data-grid', parseInt);
+        bindCluster('filterColorGroup', 'filterMode', 'data-filter', parseInt);
+
+        // Colors
+        function hexToRgb(hex) {
+            let c = hex.substring(1);
+            if (c.length === 3) c = c.split('').map(x => x + x).join('');
+            const num = parseInt(c, 16);
+            return [(num >> 16) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255];
+        }
+
+        function rgbToHex(rgb) {
+            const r = Math.round(rgb[0] * 255).toString(16).padStart(2, '0');
+            const g = Math.round(rgb[1] * 255).toString(16).padStart(2, '0');
+            const b = Math.round(rgb[2] * 255).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`.toUpperCase();
+        }
+
+        const customBgColor = document.getElementById('customBgColor');
+        const customBgHex = document.getElementById('customBgHex');
+
+        document.querySelectorAll('.color-chip').forEach(chip => {
+            chip.onclick = () => {
+                document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                state.bgColor = hexToRgb(chip.dataset.color);
+                if (customBgColor) customBgColor.value = chip.dataset.color;
+                if (customBgHex) customBgHex.value = chip.dataset.color.toUpperCase();
+            };
+        });
+
+        if (customBgColor) {
+            customBgColor.oninput = (e) => {
+                document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+                state.bgColor = hexToRgb(e.target.value);
+                if (customBgHex) customBgHex.value = e.target.value.toUpperCase();
+            };
+        }
+
+        if (customBgHex) {
+            customBgHex.onfocus = () => customBgHex.select();
+            customBgHex.oninput = (e) => {
+                let val = e.target.value.trim();
+                if (!val.startsWith('#')) val = '#' + val;
+                if (/^#[0-9A-Fa-f]{6}$/.test(val) || /^#[0-9A-Fa-f]{3}$/.test(val)) {
+                    state.bgColor = hexToRgb(val);
+                    if (customBgColor) customBgColor.value = val;
+                    document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+                }
+            };
+            customBgHex.onblur = () => {
+                customBgHex.value = rgbToHex(state.bgColor);
+            };
+            customBgHex.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    customBgHex.blur();
+                }
+            };
+        }
+
+        // Presets Implementation
+        const presets = {
+            single_stars: {
+                mode: 0,
+                shape: 3, // 5-Star
+                pixelSize: 28,
+                pixelGap: 0.15,
+                saturation: 1.8,
+                sizeDriver: 0,
+                fitMode: 0,
+                imageZoom: 1.0,
+                imagePanX: 0.0,
+                imagePanY: 0.0,
+                scanlines: 0.0,
+                gridType: 0,
+                filterMode: 0,
+                bgColor: [0.024, 0.027, 0.039]
+            },
+            single_square: {
+                mode: 0,
+                shape: 0, // Square
+                pixelSize: 24,
+                pixelGap: 0.10,
+                saturation: 1.5,
+                sizeDriver: 0,
+                fitMode: 0,
+                imageZoom: 1.0,
+                imagePanX: 0.0,
+                imagePanY: 0.0,
+                scanlines: 0.0,
+                gridType: 0,
+                filterMode: 0,
+                bgColor: [0.02, 0.02, 0.03]
+            },
+            single_circle: {
+                mode: 0,
+                shape: 2, // Circle
+                pixelSize: 22,
+                pixelGap: 0.18,
+                saturation: 1.5,
+                sizeDriver: 1, // Luminance size
+                fitMode: 0,
+                imageZoom: 1.0,
+                imagePanX: 0.0,
+                imagePanY: 0.0,
+                scanlines: 0.0,
+                gridType: 0,
+                filterMode: 0,
+                bgColor: [0.02, 0.02, 0.04]
+            },
+            single_lcd: {
+                mode: 0,
+                shape: 10, // RGB Subpixel
+                pixelSize: 22,
+                pixelGap: 0.10,
+                saturation: 1.3,
+                sizeDriver: 0,
+                fitMode: 0,
+                imageZoom: 1.0,
+                imagePanX: 0.0,
+                imagePanY: 0.0,
+                scanlines: 0.0,
+                gridType: 0,
+                filterMode: 0,
+                bgColor: [0.01, 0.01, 0.01]
+            },
+            ramp_cosmic: {
+                mode: 1,
+                rampShapes: [11, 2, 4, 3, 7], // Empty, Dot, Sparkle, 5-Star, Heart
+                rampDriver: 0,
+                invertRamp: false,
+                pixelSize: 28,
+                pixelGap: 0.14,
+                saturation: 1.8,
+                sizeDriver: 1, // By luminance
+                fitMode: 0,
+                imageZoom: 1.0,
+                imagePanX: 0.0,
+                imagePanY: 0.0,
+                scanlines: 0.0,
+                gridType: 0,
+                filterMode: 0,
+                bgColor: [0.02, 0.02, 0.04]
+            },
+            ramp_ascii: {
+                mode: 1,
+                rampShapes: [11, 2, 6, 3, 0], // Empty, Dot, Cross, Star, Square
+                rampDriver: 0,
+                invertRamp: false,
+                pixelSize: 22,
+                pixelGap: 0.08,
+                saturation: 1.4,
+                sizeDriver: 0,
+                fitMode: 0,
+                imageZoom: 1.0,
+                imagePanX: 0.0,
+                imagePanY: 0.0,
+                scanlines: 0.0,
+                gridType: 0,
+                filterMode: 0,
+                bgColor: [0.02, 0.02, 0.03]
+            },
+            ramp_custom_emoji: {
+                mode: 1,
+                rampShapes: [12, 13, 14, 15, 16], // Custom slots 1..5
+                rampDriver: 0,
+                invertRamp: false,
+                customIcons: ['✦', '·', '✦', '★', '✿', '■'],
+                pixelSize: 26,
+                pixelGap: 0.12,
+                saturation: 1.8,
+                sizeDriver: 0,
+                fitMode: 0,
+                imageZoom: 1.0,
+                imagePanX: 0.0,
+                imagePanY: 0.0,
+                scanlines: 0.0,
+                gridType: 0,
+                filterMode: 0,
+                bgColor: [0.024, 0.027, 0.039]
+            }
+        };
+
+        function applyPreset(name) {
+            const p = presets[name];
+            if (!p) return;
+            Object.assign(state, p);
+
+            setMode(state.mode);
+
+            // Sync UI inputs
+            document.querySelectorAll('#primaryShapeGrid button').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.shape) === state.shape);
+            });
+            document.getElementById('cornerRadiusGroup').style.display = (state.shape === 1) ? 'block' : 'none';
+            singleCustomBox.style.display = (state.shape >= 12) ? 'block' : 'none';
+
+            if (state.rampShapes) {
+                for (let i = 0; i < 5; i++) {
+                    const el = document.getElementById(`rampSlot${i}`);
+                    const cBox = document.getElementById(`customBox${i}`);
+                    if (state.rampShapes[i] >= 12) {
+                        el.value = 'custom';
+                        cBox.style.display = 'flex';
+                    } else {
+                        el.value = state.rampShapes[i];
+                        cBox.style.display = 'none';
+                    }
+                }
+            }
+
+            // Sync all sliders and editable text fields
+            sliderBindings.forEach(({ el, valEl, prop, formatFn }) => {
+                if (state[prop] !== undefined) {
+                    el.value = state[prop];
+                    valEl.value = formatFn ? formatFn(state[prop]) : state[prop];
+                }
+            });
+            if (customBgHex) customBgHex.value = rgbToHex(state.bgColor);
+            if (customBgColor) customBgColor.value = rgbToHex(state.bgColor).toLowerCase();
+
+            document.querySelectorAll('#fitModeGroup button').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.fit) === state.fitMode);
+            });
+            document.querySelectorAll('#sizeDriverGroup button').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.driver) === state.sizeDriver);
+            });
+            document.querySelectorAll('#gridTypeGroup button').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.grid) === state.gridType);
+            });
+            document.querySelectorAll('#filterColorGroup button').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.filter) === (state.filterMode || 0));
+            });
+
+            updateIconAtlas();
+            resizeCanvas();
+        }
+
+        presetSelect.onchange = (e) => {
+            applyPreset(e.target.value);
+        };
+
+        // ==========================================
+        // RESIZER DRAGGING IMPLEMENTATION
+        // ==========================================
+        const resizer = document.getElementById('resizer');
+        const controlsPanel = document.getElementById('controls-panel');
+        let isDragging = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const newWidth = Math.max(300, Math.min(e.clientX, window.innerWidth - 320));
+            controlsPanel.style.width = newWidth + 'px';
+            resizeCanvas();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+            }
+        });
+
+        // ==========================================
+        // DYNAMIC CANVAS RESIZING TO IMAGE RATIO
+        // ==========================================
+        function resizeCanvas() {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const containerW = previewContent.clientWidth - 40;
+            const containerH = previewContent.clientHeight - 40;
+            if (containerW <= 0 || containerH <= 0) return;
+
+            // Always calculate media aspect ratio
+            const mediaAspect = state.mediaWidth / state.mediaHeight;
+
+            // Canvas dynamically sizes to match exact media ratio inside container
+            let displayW, displayH;
+            if (containerW / containerH > mediaAspect) {
+                displayH = containerH;
+                displayW = Math.round(containerH * mediaAspect);
+            } else {
+                displayW = containerW;
+                displayH = Math.round(containerW / mediaAspect);
+            }
+
+            canvas.style.width = displayW + 'px';
+            canvas.style.height = displayH + 'px';
+
+            const newCanvasW = Math.round(displayW * dpr);
+            const newCanvasH = Math.round(displayH * dpr);
+
+            if (canvas.width !== newCanvasW || canvas.height !== newCanvasH) {
+                canvas.width = newCanvasW;
+                canvas.height = newCanvasH;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            }
+
+            canvasSizeBadge.textContent = `${state.mediaWidth}×${state.mediaHeight} (${mediaAspect >= 1 ? mediaAspect.toFixed(2) + ':1' : '1:' + (1/mediaAspect).toFixed(2)})`;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        let lastFrameTime = performance.now();
+
+        function renderFrame() {
+            resizeCanvas();
+
+            const now = performance.now();
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+            lastFrameTime = now;
+
+            if (state.autoSpin) {
+                state.spinAngle += 0.02;
+            }
+
+            if (state.mediaType === 'demo') {
+                updateDemoCanvas();
+                updateTexture(demoCanvas);
+            } else if (state.mediaType === 'video') {
+                if (!hiddenVideo.paused && hiddenVideo.readyState >= 2) {
+                    updateTexture(hiddenVideo);
+                }
+                if (hiddenVideo.duration) {
+                    const pct = (hiddenVideo.currentTime / hiddenVideo.duration) * 100;
+                    if (document.activeElement !== videoScrub && document.activeElement !== sideScrub) {
+                        videoScrub.value = pct;
+                        if (sideScrub) sideScrub.value = pct;
+                    }
+                    const timeStr = `${formatTime(hiddenVideo.currentTime)} / ${formatTime(hiddenVideo.duration)}`;
+                    videoTime.textContent = timeStr;
+                    if (sideTimeDisplay) sideTimeDisplay.textContent = timeStr;
+                }
+            } else if (state.mediaType === 'gif' && state.gifFrames && state.gifFrames.length > 0) {
+                if (state.gifPlaying && state.gifFrames.length > 1) {
+                    state.gifFrameTimer += dt * state.playbackRate;
+                    const curDur = state.gifFrames[state.gifCurrentFrame]?.duration || 0.1;
+                    if (state.gifFrameTimer >= curDur) {
+                        state.gifFrameTimer -= curDur;
+                        let next = state.gifCurrentFrame + 1;
+                        if (next >= state.gifFrames.length) {
+                            if (state.loopMedia) {
+                                next = 0;
+                            } else {
+                                next = state.gifFrames.length - 1;
+                                state.gifPlaying = false;
+                                updatePlayPauseUI(false);
+                            }
+                        }
+                        state.gifCurrentFrame = next;
+                    }
+                }
+                const curBmp = state.gifFrames[state.gifCurrentFrame]?.bitmap;
+                if (curBmp) {
+                    updateTexture(curBmp);
+                }
+                if (state.gifTotalDuration > 0) {
+                    let curSec = 0;
+                    for (let f = 0; f < state.gifCurrentFrame; f++) {
+                        curSec += (state.gifFrames[f]?.duration || 0.1);
+                    }
+                    curSec += state.gifFrameTimer;
+                    const pct = Math.min((curSec / state.gifTotalDuration) * 100, 100);
+                    if (document.activeElement !== videoScrub && document.activeElement !== sideScrub) {
+                        videoScrub.value = pct;
+                        if (sideScrub) sideScrub.value = pct;
+                    }
+                    const timeStr = `${formatTime(curSec)} / ${formatTime(state.gifTotalDuration)}`;
+                    videoTime.textContent = timeStr;
+                    if (sideTimeDisplay) sideTimeDisplay.textContent = timeStr;
+                }
+            } else if (state.mediaType === 'gif_fallback' && state.gifFallbackImg) {
+                updateTexture(state.gifFallbackImg);
+            }
+
+            gl.useProgram(program);
+
+            gl.uniform1i(uniforms.uTexture, 0);
+            gl.uniform1i(uniforms.uIconAtlas, 1);
+            gl.uniform2f(uniforms.uResolution, canvas.width, canvas.height);
+            gl.uniform2f(uniforms.uMediaResolution, state.mediaWidth, state.mediaHeight);
+            gl.uniform1f(uniforms.uPixelSize, state.pixelSize * (window.devicePixelRatio || 1));
+            gl.uniform1f(uniforms.uPixelGap, state.pixelGap);
+            gl.uniform1f(uniforms.uCornerRadius, state.cornerRadius);
+            gl.uniform1i(uniforms.uMode, state.mode);
+            gl.uniform1i(uniforms.uShape, state.shape);
+            gl.uniform1iv(uniforms.uRampShapes, new Int32Array(state.rampShapes));
+            gl.uniform1i(uniforms.uRampDriver, state.rampDriver);
+            gl.uniform1i(uniforms.uInvertRamp, state.invertRamp ? 1 : 0);
+            gl.uniform1i(uniforms.uGridType, state.gridType);
+            gl.uniform1f(uniforms.uAspect, state.aspect);
+            gl.uniform1f(uniforms.uRotation, (state.rotation * Math.PI / 180) + state.spinAngle);
+            gl.uniform1f(uniforms.uSaturation, state.saturation);
+            gl.uniform1f(uniforms.uContrast, state.contrast);
+            gl.uniform1f(uniforms.uBrightness, state.brightness);
+            gl.uniform1i(uniforms.uSizeDriver, state.sizeDriver);
+            gl.uniform1f(uniforms.uMinScale, state.minScale);
+            gl.uniform1f(uniforms.uMaxScale, state.maxScale);
+            gl.uniform1i(uniforms.uInvertSize, state.invertSize ? 1 : 0);
+            gl.uniform1f(uniforms.uScanlines, state.scanlines);
+            gl.uniform3fv(uniforms.uBgColor, new Float32Array(state.bgColor));
+            gl.uniform1i(uniforms.uFitMode, state.fitMode);
+            gl.uniform1f(uniforms.uImageZoom, state.imageZoom);
+            gl.uniform2f(uniforms.uImagePan, state.imagePanX * 0.5, state.imagePanY * 0.5);
+            gl.uniform1i(uniforms.uFilterMode, state.filterMode || 0);
+
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+
+        function animationLoop() {
+            renderFrame();
+            requestAnimationFrame(animationLoop);
+        }
+
+        // Initialize
+        updateIconAtlas();
+        resizeCanvas();
+        applyPreset('single_stars');
+        requestAnimationFrame(animationLoop);
+
+    </script>
+</body>
+</html>
