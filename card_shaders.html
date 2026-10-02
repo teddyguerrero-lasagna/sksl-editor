@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixel Card Protection & Glassmorphism Shader Lab</title>
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --border: #e0e0e0;
+      --text: #1f1f1f;
+      --text-sub: #5f6368;
+      --primary: #1a73e8;
+      --primary-hover: #1557b0;
+      --accent: #ed225d;
+      --panel-width: 360px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Navigation Header */
+    header {
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      flex-shrink: 0;
+      z-index: 50;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .badge-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: #e8f0fe;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: #f1f3f4;
+      padding: 3px;
+      border-radius: 8px;
+    }
+
+    .nav-tab {
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-sub);
+      text-decoration: none;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--text);
+    }
+
+    .nav-tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button.btn {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    button.btn-outline {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    button.btn-outline:hover {
+      background: #f1f3f4;
+      border-color: #dadce0;
+    }
+
+    button.btn-primary {
+      background: var(--primary);
+      border: 1px solid var(--primary);
+      color: #fff;
+    }
+
+    button.btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Main Workspace */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      width: var(--panel-width);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .controls-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-sub);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Presets Carousel / Grid */
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .preset-btn {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #f8f9fa;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .preset-btn:hover {
+      background: #f1f3f4;
+      border-color: #d2d2d2;
+    }
+
+    .preset-btn.active {
+      border-color: var(--primary);
+      background: #e8f0fe;
+    }
+
+    .preset-btn strong {
+      display: block;
+      font-size: 12px;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .preset-btn span {
+      font-size: 10px;
+      color: var(--text-sub);
+    }
+
+    /* Sliders and Inputs */
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .control-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .control-val {
+      font-family: 'Google Sans Mono', monospace;
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: ew-resize;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: transform 0.1s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .color-input-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: 1px solid var(--border);
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0;
+      background: transparent;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
+
+    /* Wallpaper Thumbnails */
+    .wallpaper-list {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .wp-thumb {
+      width: 52px;
+      height: 80px;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      object-fit: cover;
+      flex-shrink: 0;
+      transition: border-color 0.15s;
+    }
+
+    .wp-thumb.active {
+      border-color: var(--primary);
+    }
+
+    /* Center Stage (Device Simulator) */
+    .stage-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      background: #eceff1;
+      overflow: hidden;
+      padding: 30px;
+      user-select: none;
+    }
+
+    /* Pixel Device Silhouette */
+    .device-frame {
+      width: 412px;
+      height: 919px;
+      position: relative;
+      border-radius: 52px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 12px #202124, 0 0 0 14px #3c4043;
+      overflow: hidden;
+      background: #000;
+      transform-origin: center center;
+    }
+
+    /* Live Wallpaper Background */
+    #device-wallpaper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .wallpaper-scrim {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.15);
+      pointer-events: none;
+    }
+
+    /* Device Status Bar */
+    .status-bar {
+      position: absolute;
+      top: 14px;
+      left: 30px;
+      right: 30px;
+      height: 18px;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .status-bar img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Clock & Greeting */
+    .device-header {
+      position: absolute;
+      top: 75px;
+      left: 32px;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .device-clock {
+      font-size: 42px;
+      font-weight: 400;
+      letter-spacing: 1.2px;
+      color: #353535;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .device-greeting {
+      font-family: 'Google Sans Mono', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: #353535;
+    }
+
+    /* Protected Card Container (Draggable) */
+    .protected-card {
+      position: absolute;
+      width: 364px;
+      height: 319px;
+      left: 24px;
+      top: 540px;
+      cursor: grab;
+      border-radius: 40px;
+      z-index: 30;
+      touch-action: none;
+    }
+
+    .protected-card.dragging {
+      cursor: grabbing;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+    }
+
+    /* GPU Shader Canvas under Card */
+    #shader-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    /* Content over Card */
+    .card-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      padding: 30px 28px 24px 28px;
+      display: flex;
+      flex-direction: column;
+      pointer-events: none;
+    }
+
+    .card-title {
+      font-family: 'Google Sans Mono', monospace;
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 0.48px;
+      color: #0e0e0e;
+      margin-bottom: 16px;
+    }
+
+    .card-metric {
+      font-size: 42px;
+      font-weight: 400;
+      color: #353535;
+      line-height: 1;
+      margin-bottom: 24px;
+    }
+
+    .card-waveform {
+      width: 245px;
+      height: 60px;
+      margin-bottom: auto;
+    }
+
+    .card-waveform img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .card-pagination {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #878787;
+    }
+
+    .dot.active {
+      background: #0e0e0e;
+    }
+
+    /* Light Joystick Floating Indicator */
+    .light-compass {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      border: 1px solid rgba(255,255,255,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: crosshair;
+      z-index: 40;
+    }
+
+    .light-compass::before {
+      content: 'Light ☀';
+      position: absolute;
+      top: 6px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-sub);
+    }
+
+    .compass-dial {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 1px dashed #bbb;
+      position: relative;
+    }
+
+    .compass-pointer {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #f59e0b;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      margin: -6px 0 0 -6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      pointer-events: none;
+    }
+
+    /* Floating Zoom Controls */
+    .stage-tools {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      display: flex;
+      gap: 6px;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(10px);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.5);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 40;
+    }
+
+    .stage-tools button {
+      padding: 4px 8px;
+      font-size: 11px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .stage-tools button:hover {
+      background: #e0e0e0;
+    }
+
+    /* Modal / Code Drawer */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-card {
+      width: 720px;
+      max-width: 90vw;
+      max-height: 85vh;
+      background: var(--surface);
+      border-radius: 14px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--text-sub);
+    }
+
+    .modal-content {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    pre code {
+      font-family: 'Google Sans Mono', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #24292e;
+      background: #f6f8fa;
+      display: block;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand-group">
+      <div class="brand-title">Pixel Card Protection & Glassmorphism Lab</div>
+      <span class="badge-pill">AGSL / SkSL Ready</span>
+    </div>
+
+    <div class="nav-tabs">
+      <a href="index.html" class="nav-tab">Watch Face Editor</a>
+      <a href="lcd_emulator.html" class="nav-tab">LCD Emulator</a>
+      <a href="card_shaders.html" class="nav-tab active">Card Shader Lab</a>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-outline" id="btn-export-png">
+        <span>📸</span> Export Texture (Figma)
+      </button>
+      <button class="btn btn-outline" id="btn-copy-css">
+        <span>📋</span> Copy CSS
+      </button>
+      <button class="btn btn-primary" id="btn-view-agsl">
+        <span>⚡</span> View AGSL Code
+      </button>
+    </div>
+  </header>
+
+  <!-- Workspace -->
+  <div class="workspace">
+
+    <!-- Controls Panel -->
+    <div class="controls-panel">
+      <div class="controls-body">
+
+        <!-- Presets -->
+        <div>
+          <div class="section-title">Card Shader Presets</div>
+          <div class="presets-grid">
+            <button class="preset-btn active" data-preset="frosted">
+              <strong>Frosted Acrylic</strong>
+              <span>Smooth Pixel diffusion</span>
+            </button>
+            <button class="preset-btn" data-preset="caustics">
+              <strong>Sunlight Caustics</strong>
+              <span>Wavy light ripples</span>
+            </button>
+            <button class="preset-btn" data-preset="prism">
+              <strong>Prism Glass</strong>
+              <span>Chromatic edge split</span>
+            </button>
+            <button class="preset-btn" data-preset="obsidian">
+              <strong>Obsidian Dark</strong>
+              <span>Deep smoke specular</span>
+            </button>
+            <button class="preset-btn" data-preset="liquid">
+              <strong>Liquid Lens</strong>
+              <span>Curved surface bulge</span>
+            </button>
+            <button class="preset-btn" data-preset="minimal">
+              <strong>Subtle Scrim</strong>
+              <span>High contrast utility</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Wallpaper Switcher -->
+        <div>
+          <div class="section-title">
+            <span>Wallpaper</span>
+            <label style="cursor: pointer; font-size: 10px; color: var(--primary); text-transform: none; font-weight: normal;">
+              Upload Custom
+              <input type="file" id="wp-file-input" accept="image/*" style="display: none;">
+            </label>
+          </div>
+          <div class="wallpaper-list">
+            <img src="assets/wallpaper_sunset.png" class="wp-thumb active" data-src="assets/wallpaper_sunset.png" title="Teddy Sketchbook Sunset">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='160' viewBox='0 0 100 160'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23111827'/%3E%3Cstop offset='50%25' stop-color='%231e1b4b'/%3E%3Cstop offset='100%25' stop-color='%230f172a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='160' fill='url(%23g)'/%3E%3Ccircle cx='30' cy='60' r='40' fill='%234338ca' opacity='0.4' filter='blur(15px)'/%3E%3Ccircle cx='80' cy='120' r='50' fill='%236366f1' opacity='0.3' filter='blur(20px)'/%3E%3C/svg%3E" class="wp-thumb" data-src="midnight" title="Midnight Aura">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='160' viewBox='0 0 100 160'%3E%3Cdefs%3E%3ClinearGradient id='g2' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23064e3b'/%3E%3Cstop offset='50%25' stop-color='%23047857'/%3E%3Cstop offset='100%25' stop-color='%2310b981'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='160' fill='url(%23g2)'/%3E%3Ccircle cx='70' cy='40' r='35' fill='%2334d399' opacity='0.5' filter='blur(18px)'/%3E%3C/svg%3E" class="wp-thumb" data-src="emerald" title="Botanical Emerald">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='160' viewBox='0 0 100 160'%3E%3Crect width='100' height='160' fill='%23ffffff'/%3E%3Cpath d='M0 0 L100 160 M20 0 L100 128 M0 32 L80 160 M40 0 L100 96 M0 64 L60 160' stroke='%23000' stroke-width='6'/%3E%3C/svg%3E" class="wp-thumb" data-src="grid" title="High Contrast Pattern">
+          </div>
+        </div>
+
+        <!-- Refraction & Optics -->
+        <div>
+          <div class="section-title">Optical Refraction & Lens</div>
+          
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Refraction Strength</span>
+              <span class="control-val" id="val-refract">0.035</span>
+            </div>
+            <input type="range" id="param-refract" min="0" max="0.12" step="0.002" value="0.035">
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Chromatic Dispersion (Prism)</span>
+              <span class="control-val" id="val-dispersion">0.018</span>
+            </div>
+            <input type="range" id="param-dispersion" min="0" max="0.08" step="0.002" value="0.018">
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Edge Bevel Width</span>
+              <span class="control-val" id="val-bevel">24 px</span>
+            </div>
+            <input type="range" id="param-bevel" min="4" max="60" step="1" value="24">
+          </div>
+        </div>
+
+        <!-- Frosted Blur & Texture -->
+        <div>
+          <div class="section-title">Frosted Blur & Diffusion</div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Blur Radius</span>
+              <span class="control-val" id="val-blur">22 px</span>
+            </div>
+            <input type="range" id="param-blur" min="0" max="50" step="1" value="22">
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Micro-Surface Roughness (Grain)</span>
+              <span class="control-val" id="val-roughness">0.035</span>
+            </div>
+            <input type="range" id="param-roughness" min="0" max="0.1" step="0.005" value="0.035">
+          </div>
+        </div>
+
+        <!-- Caustics & Liquid Light -->
+        <div>
+          <div class="section-title">Caustics & Fluid Light</div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Caustic Intensity</span>
+              <span class="control-val" id="val-caustic-int">0.25</span>
+            </div>
+            <input type="range" id="param-caustic-int" min="0" max="0.8" step="0.02" value="0.25">
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Ripple Speed</span>
+              <span class="control-val" id="val-caustic-spd">0.60</span>
+            </div>
+            <input type="range" id="param-caustic-spd" min="0" max="2.0" step="0.05" value="0.6">
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Wave Frequency / Scale</span>
+              <span class="control-val" id="val-caustic-scale">6.5</span>
+            </div>
+            <input type="range" id="param-caustic-scale" min="2" max="18" step="0.5" value="6.5">
+          </div>
+        </div>
+
+        <!-- Specular & Rim Lighting -->
+        <div>
+          <div class="section-title">Specular Rim & Bevel Lighting</div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Specular Glint Intensity</span>
+              <span class="control-val" id="val-specular">0.55</span>
+            </div>
+            <input type="range" id="param-specular" min="0" max="1.0" step="0.05" value="0.55">
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Light Angle</span>
+              <span class="control-val" id="val-light-angle">45°</span>
+            </div>
+            <input type="range" id="param-light-angle" min="0" max="360" step="5" value="45">
+          </div>
+        </div>
+
+        <!-- Protection Scrim & Tint -->
+        <div>
+          <div class="section-title">Protection Scrim & Tint</div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Scrim Opacity</span>
+              <span class="control-val" id="val-tint-opacity">0.45</span>
+            </div>
+            <input type="range" id="param-tint-opacity" min="0" max="0.9" step="0.02" value="0.45">
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Surface Tint Color</span>
+            </div>
+            <div class="color-input-row">
+              <input type="color" id="param-tint-color" value="#c4c4c4">
+              <span class="control-val" id="val-tint-color">#C4C4C4 (Pixel Baseline)</span>
+            </div>
+          </div>
+
+          <div class="control-item">
+            <div class="control-label-row">
+              <span>Corner Radius</span>
+              <span class="control-val" id="val-radius">40 px</span>
+            </div>
+            <input type="range" id="param-radius" min="0" max="80" step="2" value="40">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Center Stage (Device Simulator) -->
+    <div class="stage-container" id="stage">
+
+      <div class="device-frame" id="device">
+        <!-- Background Wallpaper -->
+        <img id="device-wallpaper" src="assets/wallpaper_sunset.png" alt="Wallpaper">
+        <div class="wallpaper-scrim"></div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <img src="assets/status_bar.svg" alt="Status Bar">
+        </div>
+
+        <!-- Header Clock & Greeting -->
+        <div class="device-header">
+          <div class="device-clock">9:30 P</div>
+          <div class="device-greeting">Good Evening, Tyler</div>
+        </div>
+
+        <!-- Protected Card Surface (Draggable) -->
+        <div class="protected-card" id="card">
+          <!-- WebGL Shader Canvas -->
+          <canvas id="shader-canvas" width="364" height="319"></canvas>
+
+          <!-- Card Content -->
+          <div class="card-content">
+            <div class="card-title">In rhythm with yourself</div>
+            <div class="card-metric">92</div>
+            <div class="card-waveform">
+              <img src="assets/rhythm_graph.svg" alt="Rhythm Waveform">
+            </div>
+            <div class="card-pagination">
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating 3D Light Compass Joystick -->
+      <div class="light-compass" id="light-compass" title="Drag to adjust virtual 3D light angle">
+        <div class="compass-dial">
+          <div class="compass-pointer" id="compass-pointer"></div>
+        </div>
+      </div>
+
+      <!-- Zoom and Fit Tools -->
+      <div class="stage-tools">
+        <button id="btn-zoom-out">－</button>
+        <button id="btn-zoom-reset">Fit (100%)</button>
+        <button id="btn-zoom-in">＋</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal for AGSL Code / Export -->
+  <div class="modal-backdrop" id="modal-agsl">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Android AGSL / SkSL Shader Code</h3>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-content">
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 12px;">
+          This shader is 100% compatible with <strong>Android 13+ (RuntimeShader / AGSL)</strong> and <strong>Skia / SkSL</strong>.
+          Apply it to any Card view container using <code>RenderEffect.createRuntimeShaderEffect()</code>.
+        </p>
+        <pre><code id="agsl-code-block"></code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shader Engine Script -->
+  <script>
+    // --- State & Uniforms ---
+    const state = {
+      refraction: 0.035,
+      dispersion: 0.018,
+      bevelWidth: 24.0,
+      blurRadius: 22.0,
+      roughness: 0.035,
+      causticIntensity: 0.25,
+      causticSpeed: 0.60,
+      causticScale: 6.5,
+      specular: 0.55,
+      lightAngle: 45.0, // degrees
+      tintOpacity: 0.45,
+      tintColor: [0.768, 0.768, 0.768], // #c4c4c4
+      cornerRadius: 40.0,
+      zoom: 1.0,
+      cardPos: { x: 24, y: 540 },
+      screenSize: { w: 412, h: 919 }
+    };
+
+    // Preset configurations
+    const PRESETS = {
+      frosted: {
+        refraction: 0.030, dispersion: 0.015, bevelWidth: 22, blurRadius: 24,
+        roughness: 0.035, causticIntensity: 0.15, causticSpeed: 0.5, causticScale: 6.0,
+        specular: 0.50, lightAngle: 45, tintOpacity: 0.45, tintColor: [0.77, 0.77, 0.77], cornerRadius: 40
+      },
+      caustics: {
+        refraction: 0.045, dispersion: 0.025, bevelWidth: 28, blurRadius: 18,
+        roughness: 0.020, causticIntensity: 0.55, causticSpeed: 1.1, causticScale: 7.5,
+        specular: 0.70, lightAngle: 60, tintOpacity: 0.35, tintColor: [0.82, 0.85, 0.90], cornerRadius: 40
+      },
+      prism: {
+        refraction: 0.065, dispersion: 0.055, bevelWidth: 32, blurRadius: 16,
+        roughness: 0.015, causticIntensity: 0.20, causticSpeed: 0.4, causticScale: 5.5,
+        specular: 0.85, lightAngle: 35, tintOpacity: 0.30, tintColor: [0.90, 0.90, 0.95], cornerRadius: 40
+      },
+      obsidian: {
+        refraction: 0.025, dispersion: 0.010, bevelWidth: 20, blurRadius: 28,
+        roughness: 0.040, causticIntensity: 0.10, causticSpeed: 0.3, causticScale: 5.0,
+        specular: 0.75, lightAngle: 50, tintOpacity: 0.70, tintColor: [0.15, 0.16, 0.18], cornerRadius: 40
+      },
+      liquid: {
+        refraction: 0.085, dispersion: 0.035, bevelWidth: 45, blurRadius: 12,
+        roughness: 0.010, causticIntensity: 0.45, causticSpeed: 0.8, causticScale: 8.5,
+        specular: 0.90, lightAngle: 45, tintOpacity: 0.25, tintColor: [0.85, 0.90, 0.95], cornerRadius: 40
+      },
+      minimal: {
+        refraction: 0.012, dispersion: 0.005, bevelWidth: 14, blurRadius: 32,
+        roughness: 0.020, causticIntensity: 0.00, causticSpeed: 0.0, causticScale: 4.0,
+        specular: 0.30, lightAngle: 45, tintOpacity: 0.60, tintColor: [0.77, 0.77, 0.77], cornerRadius: 40
+      }
+    };
+
+    // --- WebGL Pipeline Setup ---
+    const canvas = document.getElementById('shader-canvas');
+    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false });
+    if (!gl) alert('WebGL2 required for GPU Card Shaders');
+
+    const vsSource = `#version 300 es
+      in vec2 aPos;
+      out vec2 vUV;
+      void main() {
+        vUV = aPos * 0.5 + 0.5;
+        gl_Position = vec4(aPos, 0.0, 1.0);
+      }
+    `;
+
+    const fsSource = `#version 300 es
+      precision highp float;
+      in vec2 vUV;
+      out vec4 fragColor;
+
+      uniform vec2 uCardSize;
+      uniform vec2 uCardPos;
+      uniform vec2 uScreenSize;
+      uniform float uTime;
+      uniform sampler2D uWallpaper;
+
+      uniform float uRadius;
+      uniform float uRefractStrength;
+      uniform float uDispersion;
+      uniform float uBevelWidth;
+      uniform float uBlurRadius;
+      uniform float uRoughness;
+      uniform float uCausticIntensity;
+      uniform float uCausticSpeed;
+      uniform float uCausticScale;
+      uniform float uSpecular;
+      uniform float uLightAngleRad;
+      uniform vec3 uTintColor;
+      uniform float uTintOpacity;
+
+      // Analytical Signed Distance Field for Rounded Box
+      float sdRoundBox(vec2 p, vec2 b, float r) {
+        vec2 q = abs(p) - b + r;
+        return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+      }
+
+      // Fast hash for micro-surface grain
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+
+      void main() {
+        vec2 pixelCoord = vUV * uCardSize;
+        vec2 center = uCardSize * 0.5;
+        vec2 p = pixelCoord - center;
+
+        // Calculate SDF distance
+        float dist = sdRoundBox(p, center, uRadius);
+        if (dist > 0.0) {
+          fragColor = vec4(0.0);
+          return;
+        }
+
+        // Distance from outer boundary inward
+        float edgeDist = -dist;
+        float bevelFactor = smoothstep(uBevelWidth, 0.0, edgeDist);
+
+        // Compute 2D Surface Normal from SDF gradient
+        vec2 eps = vec2(1.0, 0.0);
+        vec2 norm2D = normalize(vec2(
+          sdRoundBox(p + eps.xy, center, uRadius) - sdRoundBox(p - eps.xy, center, uRadius),
+          sdRoundBox(p + eps.yx, center, uRadius) - sdRoundBox(p - eps.yx, center, uRadius)
+        ));
+
+        // Screen-space texture coordinates of this pixel
+        vec2 screenCoord = uCardPos + pixelCoord;
+        vec2 baseUV = vec2(screenCoord.x / uScreenSize.x, 1.0 - (screenCoord.y / uScreenSize.y));
+
+        // Optical Refraction displacement
+        vec2 refrDir = -norm2D * bevelFactor * uRefractStrength;
+        refrDir.y = -refrDir.y; // Match WebGL texture coordinate flip
+
+        // Chromatic Dispersion (Prism RGB separation)
+        vec2 uvR = baseUV + refrDir * (1.0 + uDispersion);
+        vec2 uvG = baseUV + refrDir;
+        vec2 uvB = baseUV + refrDir * (1.0 - uDispersion);
+
+        // Multi-tap Poisson / Spiral Diffusion Blur
+        vec3 blurred = vec3(0.0);
+        float totalW = 0.0;
+        float blurScale = (uBlurRadius / uScreenSize.y);
+
+        // 16-tap golden angle spiral
+        for (int i = 0; i < 16; i++) {
+          float fi = float(i);
+          float r = sqrt((fi + 0.5) / 16.0) * blurScale;
+          float theta = fi * 2.39996323; // Golden angle
+          vec2 offset = vec2(cos(theta), sin(theta)) * r;
+
+          float cr = texture(uWallpaper, uvR + offset).r;
+          float cg = texture(uWallpaper, uvG + offset).g;
+          float cb = texture(uWallpaper, uvB + offset).b;
+          blurred += vec3(cr, cg, cb);
+          totalW += 1.0;
+        }
+        blurred /= totalW;
+
+        // Animated Fluid Light Caustics
+        float finalCaustic = 0.0;
+        if (uCausticIntensity > 0.001) {
+          vec2 cUV = (pixelCoord / uCardSize.y) * uCausticScale;
+          float t = uTime * uCausticSpeed;
+          float w1 = sin(cUV.x * 2.1 + t) + cos(cUV.y * 1.9 - t * 0.9);
+          float w2 = sin(cUV.x * 3.3 - t * 1.2 + cUV.y * 1.6) + cos(cUV.y * 2.8 + t * 0.8);
+          float w3 = sin((cUV.x + cUV.y) * 4.2 + t * 1.4);
+          float c1 = pow(clamp(0.5 + 0.5 * sin(w1 + w2 + w3), 0.0, 1.0), 3.0);
+          float c2 = pow(clamp(0.5 + 0.5 * cos(w2 * 1.4 - w1 + t * 0.7), 0.0, 1.0), 4.0);
+          finalCaustic = (c1 * 0.65 + c2 * 0.35) * uCausticIntensity;
+        }
+
+        // 3D Specular Rim & Bevel Lighting
+        vec3 lightDir = normalize(vec3(cos(uLightAngleRad), -sin(uLightAngleRad), 0.85));
+        vec3 surfaceNorm = normalize(vec3(norm2D * bevelFactor, 1.0 - bevelFactor * 0.6));
+        vec3 viewDir = vec3(0.0, 0.0, 1.0);
+        vec3 halfVec = normalize(lightDir + viewDir);
+
+        float NdotH = max(dot(surfaceNorm, halfVec), 0.0);
+        float spec = pow(NdotH, 20.0) * bevelFactor * uSpecular;
+        float innerRimGlow = pow(bevelFactor, 2.5) * 0.20;
+
+        // Micro-Surface Tactile Grain
+        float grain = (hash(pixelCoord + fract(uTime * 0.05)) - 0.5) * uRoughness;
+
+        // Composite Surface
+        // 1. Base blurred wallpaper
+        vec3 col = blurred;
+        // 2. Blend with protection scrim tint
+        col = mix(col, uTintColor, uTintOpacity);
+        // 3. Add Caustics
+        col += vec3(finalCaustic);
+        // 4. Add Specular highlight and inner rim glow
+        col += vec3(spec + innerRimGlow);
+        // 5. Add micro-grain
+        col += vec3(grain);
+
+        // Smooth anti-aliased edge mask
+        float alpha = smoothstep(0.0, -1.5, dist);
+
+        fragColor = vec4(col, alpha);
+      }
+    `;
+
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    // Quad geometry
+    const quadVAO = gl.createVertexArray();
+    gl.bindVertexArray(quadVAO);
+    const quadVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,  1, -1, -1,  1,
+      -1,  1,  1, -1,  1,  1
+    ]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(program, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    // Uniform Locations
+    const uLoc = {
+      cardSize: gl.getUniformLocation(program, 'uCardSize'),
+      cardPos: gl.getUniformLocation(program, 'uCardPos'),
+      screenSize: gl.getUniformLocation(program, 'uScreenSize'),
+      time: gl.getUniformLocation(program, 'uTime'),
+      wallpaper: gl.getUniformLocation(program, 'uWallpaper'),
+      radius: gl.getUniformLocation(program, 'uRadius'),
+      refractStrength: gl.getUniformLocation(program, 'uRefractStrength'),
+      dispersion: gl.getUniformLocation(program, 'uDispersion'),
+      bevelWidth: gl.getUniformLocation(program, 'uBevelWidth'),
+      blurRadius: gl.getUniformLocation(program, 'uBlurRadius'),
+      roughness: gl.getUniformLocation(program, 'uRoughness'),
+      causticIntensity: gl.getUniformLocation(program, 'uCausticIntensity'),
+      causticSpeed: gl.getUniformLocation(program, 'uCausticSpeed'),
+      causticScale: gl.getUniformLocation(program, 'uCausticScale'),
+      specular: gl.getUniformLocation(program, 'uSpecular'),
+      lightAngleRad: gl.getUniformLocation(program, 'uLightAngleRad'),
+      tintColor: gl.getUniformLocation(program, 'uTintColor'),
+      tintOpacity: gl.getUniformLocation(program, 'uTintOpacity')
+    };
+
+    // Load Wallpaper Texture
+    const wallpaperTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, wallpaperTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    const wpImg = document.getElementById('device-wallpaper');
+    function updateTexture() {
+      gl.bindTexture(gl.TEXTURE_2D, wallpaperTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, wpImg);
+    }
+    if (wpImg.complete) updateTexture();
+    else wpImg.onload = updateTexture;
+
+    // --- Render Loop ---
+    let startTime = performance.now();
+    function render() {
+      const now = performance.now();
+      const elapsed = (now - startTime) * 0.001;
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      gl.useProgram(program);
+
+      // Pass uniforms
+      gl.uniform2f(uLoc.cardSize, canvas.width, canvas.height);
+      gl.uniform2f(uLoc.cardPos, state.cardPos.x, state.cardPos.y);
+      gl.uniform2f(uLoc.screenSize, state.screenSize.w, state.screenSize.h);
+      gl.uniform1f(uLoc.time, elapsed);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, wallpaperTex);
+      gl.uniform1i(uLoc.wallpaper, 0);
+
+      gl.uniform1f(uLoc.radius, state.cornerRadius);
+      gl.uniform1f(uLoc.refractStrength, state.refraction);
+      gl.uniform1f(uLoc.dispersion, state.dispersion);
+      gl.uniform1f(uLoc.bevelWidth, state.bevelWidth);
+      gl.uniform1f(uLoc.blurRadius, state.blurRadius);
+      gl.uniform1f(uLoc.roughness, state.roughness);
+      gl.uniform1f(uLoc.causticIntensity, state.causticIntensity);
+      gl.uniform1f(uLoc.causticSpeed, state.causticSpeed);
+      gl.uniform1f(uLoc.causticScale, state.causticScale);
+      gl.uniform1f(uLoc.specular, state.specular);
+      gl.uniform1f(uLoc.lightAngleRad, (state.lightAngle * Math.PI) / 180.0);
+      gl.uniform3fv(uLoc.tintColor, state.tintColor);
+      gl.uniform1f(uLoc.tintOpacity, state.tintOpacity);
+
+      gl.bindVertexArray(quadVAO);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+
+    // --- Interactive Dragging of Card ---
+    const cardEl = document.getElementById('card');
+    const deviceEl = document.getElementById('device');
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let cardStart = { x: 24, y: 540 };
+
+    cardEl.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      cardEl.classList.add('dragging');
+      dragStart = { x: e.clientX, y: e.clientY };
+      cardStart = { x: state.cardPos.x, y: state.cardPos.y };
+      cardEl.setPointerCapture(e.pointerId);
+    });
+
+    cardEl.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = (e.clientX - dragStart.x) / state.zoom;
+      const dy = (e.clientY - dragStart.y) / state.zoom;
+
+      let nx = Math.max(0, Math.min(state.screenSize.w - 364, cardStart.x + dx));
+      let ny = Math.max(60, Math.min(state.screenSize.h - 319 - 20, cardStart.y + dy));
+
+      state.cardPos.x = nx;
+      state.cardPos.y = ny;
+      cardEl.style.left = nx + 'px';
+      cardEl.style.top = ny + 'px';
+    });
+
+    cardEl.addEventListener('pointerup', (e) => {
+      isDragging = false;
+      cardEl.classList.remove('dragging');
+    });
+
+    // --- Interactive Light Compass ---
+    const compassEl = document.getElementById('light-compass');
+    const pointerEl = document.getElementById('compass-pointer');
+    let isCompassDragging = false;
+
+    function updateCompass(e) {
+      const rect = compassEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      if (angle < 0) angle += 360;
+
+      state.lightAngle = Math.round(angle);
+      document.getElementById('param-light-angle').value = state.lightAngle;
+      document.getElementById('val-light-angle').textContent = state.lightAngle + '°';
+
+      // Update pointer position
+      const r = 24;
+      const rad = (angle * Math.PI) / 180;
+      const px = Math.cos(rad) * r;
+      const py = Math.sin(rad) * r;
+      pointerEl.style.transform = `translate(${px}px, ${py}px)`;
+    }
+
+    compassEl.addEventListener('pointerdown', (e) => {
+      isCompassDragging = true;
+      updateCompass(e);
+      compassEl.setPointerCapture(e.pointerId);
+    });
+    compassEl.addEventListener('pointermove', (e) => {
+      if (isCompassDragging) updateCompass(e);
+    });
+    compassEl.addEventListener('pointerup', () => { isCompassDragging = false; });
+
+    // Initial compass pointer setup
+    (() => {
+      const rad = (state.lightAngle * Math.PI) / 180;
+      pointerEl.style.transform = `translate(${Math.cos(rad) * 24}px, ${Math.sin(rad) * 24}px)`;
+    })();
+
+    // --- UI Controls Binding ---
+    function bindSlider(id, key, valId, unit = '', mult = 1) {
+      const slider = document.getElementById(id);
+      const valText = document.getElementById(valId);
+      slider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        state[key] = val;
+        valText.textContent = (mult !== 1 ? (val * mult).toFixed(mult >= 10 ? 0 : 2) : val) + unit;
+      });
+    }
+
+    bindSlider('param-refract', 'refraction', 'val-refract');
+    bindSlider('param-dispersion', 'dispersion', 'val-dispersion');
+    bindSlider('param-bevel', 'bevelWidth', 'val-bevel', ' px');
+    bindSlider('param-blur', 'blurRadius', 'val-blur', ' px');
+    bindSlider('param-roughness', 'roughness', 'val-roughness');
+    bindSlider('param-caustic-int', 'causticIntensity', 'val-caustic-int');
+    bindSlider('param-caustic-spd', 'causticSpeed', 'val-caustic-spd');
+    bindSlider('param-caustic-scale', 'causticScale', 'val-caustic-scale');
+    bindSlider('param-specular', 'specular', 'val-specular');
+    bindSlider('param-tint-opacity', 'tintOpacity', 'val-tint-opacity');
+    bindSlider('param-radius', 'cornerRadius', 'val-radius', ' px');
+
+    // Radius updates DOM card styling as well
+    document.getElementById('param-radius').addEventListener('input', (e) => {
+      cardEl.style.borderRadius = e.target.value + 'px';
+    });
+
+    // Color Tint
+    document.getElementById('param-tint-color').addEventListener('input', (e) => {
+      const hex = e.target.value;
+      const r = parseInt(hex.slice(1,3), 16) / 255;
+      const g = parseInt(hex.slice(3,5), 16) / 255;
+      const b = parseInt(hex.slice(5,7), 16) / 255;
+      state.tintColor = [r, g, b];
+      document.getElementById('val-tint-color').textContent = hex.toUpperCase();
+    });
+
+    // Light Angle Slider
+    document.getElementById('param-light-angle').addEventListener('input', (e) => {
+      state.lightAngle = parseFloat(e.target.value);
+      document.getElementById('val-light-angle').textContent = state.lightAngle + '°';
+      const rad = (state.lightAngle * Math.PI) / 180;
+      pointerEl.style.transform = `translate(${Math.cos(rad) * 24}px, ${Math.sin(rad) * 24}px)`;
+    });
+
+    // Presets
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const p = PRESETS[btn.dataset.preset];
+        if (!p) return;
+
+        Object.assign(state, p);
+
+        // Sync slider elements
+        document.getElementById('param-refract').value = p.refraction;
+        document.getElementById('val-refract').textContent = p.refraction;
+        document.getElementById('param-dispersion').value = p.dispersion;
+        document.getElementById('val-dispersion').textContent = p.dispersion;
+        document.getElementById('param-bevel').value = p.bevelWidth;
+        document.getElementById('val-bevel').textContent = p.bevelWidth + ' px';
+        document.getElementById('param-blur').value = p.blurRadius;
+        document.getElementById('val-blur').textContent = p.blurRadius + ' px';
+        document.getElementById('param-roughness').value = p.roughness;
+        document.getElementById('val-roughness').textContent = p.roughness;
+        document.getElementById('param-caustic-int').value = p.causticIntensity;
+        document.getElementById('val-caustic-int').textContent = p.causticIntensity;
+        document.getElementById('param-caustic-spd').value = p.causticSpeed;
+        document.getElementById('val-caustic-spd').textContent = p.causticSpeed;
+        document.getElementById('param-caustic-scale').value = p.causticScale;
+        document.getElementById('val-caustic-scale').textContent = p.causticScale;
+        document.getElementById('param-specular').value = p.specular;
+        document.getElementById('val-specular').textContent = p.specular;
+        document.getElementById('param-tint-opacity').value = p.tintOpacity;
+        document.getElementById('val-tint-opacity').textContent = p.tintOpacity;
+        document.getElementById('param-radius').value = p.cornerRadius;
+        document.getElementById('val-radius').textContent = p.cornerRadius + ' px';
+        cardEl.style.borderRadius = p.cornerRadius + 'px';
+
+        // Hex color conversion
+        const toHex = c => Math.round(c * 255).toString(16).padStart(2, '0');
+        const hex = `#${toHex(p.tintColor[0])}${toHex(p.tintColor[1])}${toHex(p.tintColor[2])}`;
+        document.getElementById('param-tint-color').value = hex;
+        document.getElementById('val-tint-color').textContent = hex.toUpperCase();
+
+        const rad = (p.lightAngle * Math.PI) / 180;
+        pointerEl.style.transform = `translate(${Math.cos(rad) * 24}px, ${Math.sin(rad) * 24}px)`;
+      });
+    });
+
+    // Wallpaper Switcher
+    document.querySelectorAll('.wp-thumb').forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        document.querySelectorAll('.wp-thumb').forEach(t => t.classList.remove('active'));
+        thumb.classList.add('active');
+        const src = thumb.dataset.src;
+        if (src.startsWith('assets/')) {
+          wpImg.src = src;
+        } else {
+          wpImg.src = thumb.src;
+        }
+      });
+    });
+
+    // Custom Wallpaper Upload
+    document.getElementById('wp-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      wpImg.src = url;
+    });
+
+    // Stage Zoom & Fit
+    const stageEl = document.getElementById('stage');
+    function setZoom(z) {
+      state.zoom = Math.max(0.5, Math.min(1.5, z));
+      deviceEl.style.transform = `scale(${state.zoom})`;
+    }
+    // Auto-fit to viewport height
+    function autoFit() {
+      const availH = stageEl.clientHeight - 80;
+      const fitZoom = Math.min(1.0, availH / 919);
+      setZoom(fitZoom);
+    }
+    window.addEventListener('resize', autoFit);
+    autoFit();
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(state.zoom + 0.1));
+    document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(state.zoom - 0.1));
+    document.getElementById('btn-zoom-reset').addEventListener('click', autoFit);
+
+    // --- Export Texture for Figma (1x / High-Res PNG) ---
+    document.getElementById('btn-export-png').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = `pixel_glass_card_${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    // --- Copy CSS Backdrop-Filter ---
+    document.getElementById('btn-copy-css').addEventListener('click', () => {
+      const hex = document.getElementById('param-tint-color').value;
+      const r = parseInt(hex.slice(1,3), 16);
+      const g = parseInt(hex.slice(3,5), 16);
+      const b = parseInt(hex.slice(5,7), 16);
+      const css = `/* Pixel Glassmorphism Surface Protection */
+.pixel-card-surface {
+  background: rgba(${r}, ${g}, ${b}, ${state.tintOpacity});
+  backdrop-filter: blur(${state.blurRadius}px) saturate(120%);
+  -webkit-backdrop-filter: blur(${state.blurRadius}px) saturate(120%);
+  border-radius: ${state.cornerRadius}px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 
+    0 12px 32px 0 rgba(0, 0, 0, 0.20),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.10);
+}`;
+      navigator.clipboard.writeText(css).then(() => {
+        alert('CSS backdrop-filter styles copied to clipboard!');
+      });
+    });
+
+    // --- View AGSL / SkSL Code Modal ---
+    const modalEl = document.getElementById('modal-agsl');
+    document.getElementById('btn-view-agsl').addEventListener('click', () => {
+      const agslCode = `// Pixel Card Surface Protection - Android AGSL / SkSL Shader
+// Compatible with Android 13+ RenderEffect.createRuntimeShaderEffect()
+
+uniform shader uWallpaper;
+uniform float2 uCardSize;      // vec2(${canvas.width}.0, ${canvas.height}.0)
+uniform float2 uCardPos;       // vec2(${state.cardPos.x}.0, ${state.cardPos.y}.0)
+uniform float2 uScreenSize;    // vec2(412.0, 919.0)
+uniform float  uTime;
+
+const float uRadius          = ${state.cornerRadius}.0;
+const float uRefractStrength = ${state.refraction};
+const float uDispersion      = ${state.dispersion};
+const float uBevelWidth      = ${state.bevelWidth}.0;
+const float uBlurRadius      = ${state.blurRadius}.0;
+const float uRoughness       = ${state.roughness};
+const float uCausticIntensity= ${state.causticIntensity};
+const float uSpecular        = ${state.specular};
+const float uLightAngleRad   = ${(state.lightAngle * Math.PI / 180).toFixed(4)};
+const half3 uTintColor       = half3(${state.tintColor.map(c => c.toFixed(3)).join(', ')});
+const half  uTintOpacity     = ${state.tintOpacity};
+
+float sdRoundBox(float2 p, float2 b, float r) {
+    float2 q = abs(p) - b + r;
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+
+float hash(float2 p) {
+    return fract(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+half4 main(float2 fragCoord) {
+    float2 center = uCardSize * 0.5;
+    float2 p = fragCoord - center;
+    float dist = sdRoundBox(p, center, uRadius);
+    if (dist > 0.0) {
+        return half4(0.0);
+    }
+
+    float edgeDist = -dist;
+    float bevelFactor = smoothstep(uBevelWidth, 0.0, edgeDist);
+
+    // Compute SDF normal
+    float2 eps = float2(1.0, 0.0);
+    float2 norm2D = normalize(float2(
+        sdRoundBox(p + eps.xy, center, uRadius) - sdRoundBox(p - eps.xy, center, uRadius),
+        sdRoundBox(p + eps.yx, center, uRadius) - sdRoundBox(p - eps.yx, center, uRadius)
+    ));
+
+    // Screen UV and Optical Refraction
+    float2 screenCoord = uCardPos + fragCoord;
+    float2 baseUV = screenCoord / uScreenSize;
+    float2 refrDir = -norm2D * bevelFactor * uRefractStrength;
+
+    // Chromatic Dispersion (Prism RGB Split)
+    float2 uvR = baseUV + refrDir * (1.0 + uDispersion);
+    float2 uvG = baseUV + refrDir;
+    float2 uvB = baseUV + refrDir * (1.0 - uDispersion);
+
+    // Multi-tap Poisson Diffusion
+    half3 blurred = half3(0.0);
+    float blurScale = uBlurRadius / uScreenSize.y;
+    for (int i = 0; i < 16; i++) {
+        float fi = float(i);
+        float r = sqrt((fi + 0.5) / 16.0) * blurScale;
+        float theta = fi * 2.39996323;
+        float2 off = float2(cos(theta), sin(theta)) * r;
+        blurred.r += uWallpaper.eval(uvR + off).r;
+        blurred.g += uWallpaper.eval(uvG + off).g;
+        blurred.b += uWallpaper.eval(uvB + off).b;
+    }
+    blurred /= 16.0;
+
+    // Surface Caustics
+    float finalCaustic = 0.0;
+    if (uCausticIntensity > 0.001) {
+        float2 cUV = (fragCoord / uCardSize.y) * 6.5;
+        float t = uTime * 0.6;
+        float w = sin(cUV.x * 2.1 + t) + cos(cUV.y * 1.9 - t * 0.9);
+        finalCaustic = pow(clamp(0.5 + 0.5 * sin(w), 0.0, 1.0), 3.0) * uCausticIntensity;
+    }
+
+    // 3D Specular Rim Light
+    float3 lightDir = normalize(float3(cos(uLightAngleRad), sin(uLightAngleRad), 0.85));
+    float3 surfaceNorm = normalize(float3(norm2D * bevelFactor, 1.0 - bevelFactor * 0.6));
+    float3 halfVec = normalize(lightDir + float3(0.0, 0.0, 1.0));
+    float spec = pow(max(dot(surfaceNorm, halfVec), 0.0), 20.0) * bevelFactor * uSpecular;
+
+    // Surface Composite
+    half3 col = mix(blurred, uTintColor, uTintOpacity);
+    col += half3(finalCaustic + spec);
+    col += half3((hash(fragCoord) - 0.5) * uRoughness);
+
+    float alpha = smoothstep(0.0, -1.5, dist);
+    return half4(col * alpha, alpha);
+}`;
+      document.getElementById('agsl-code-block').textContent = agslCode;
+      modalEl.classList.add('active');
+    });
+
+    document.getElementById('modal-close').addEventListener('click', () => {
+      modalEl.classList.remove('active');
+    });
+    modalEl.addEventListener('click', (e) => {
+      if (e.target === modalEl) modalEl.classList.remove('active');
+    });
+  </script>
+</body>
+</html>
