@@ -1,3 +1,7 @@
 .DS_Store
 Thumbs.db
 *.log
+.env
+.env.*
+.figma_token
+figma_token.txt
