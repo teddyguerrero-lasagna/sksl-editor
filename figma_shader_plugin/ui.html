@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pixel Shader Studio</title>
+  <style>
+    :root {
+      --bg: #2c2c2c;
+      --surface: #383838;
+      --surface-hover: #444444;
+      --border: #4d4d4d;
+      --text: #ffffff;
+      --text-muted: #b3b3b3;
+      --primary: #18a0fb;
+      --primary-hover: #0d8de3;
+      --accent: #ff7262;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Top Selection Bar */
+    .selection-bar {
+      padding: 8px 12px;
+      background: #222222;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .selection-info {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      flex-shrink: 0;
+    }
+
+    .status-dot.empty {
+      background: #f59e0b;
+    }
+
+    .selection-name {
+      font-weight: 600;
+      color: var(--text);
+      max-width: 170px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .selection-dims {
+      color: var(--text-muted);
+      font-size: 10px;
+      font-family: monospace;
+    }
+
+    /* Shader Preview Canvas Area */
+    .preview-area {
+      height: 170px;
+      background: #1e1e1e;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    #shader-canvas {
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      border-radius: 12px;
+      transition: width 0.2s, height 0.2s;
+    }
+
+    .canvas-overlay-actions {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .mini-btn {
+      padding: 3px 6px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      font-size: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .mini-btn:hover {
+      background: rgba(0,0,0,0.85);
+    }
+
+    /* Scrollable Controls Body */
+    .controls-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Preset Pills Grid */
+    .presets-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .preset-pill {
+      padding: 6px 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 500;
+      text-align: center;
+      transition: all 0.15s;
+    }
+
+    .preset-pill:hover {
+      background: var(--surface-hover);
+    }
+
+    .preset-pill.active {
+      border-color: var(--primary);
+      background: rgba(24, 160, 251, 0.2);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Control Rows & Sliders */
+    .ctrl-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .ctrl-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .ctrl-val {
+      color: var(--text);
+      font-family: monospace;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 3px;
+      background: #555555;
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: ew-resize;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    .color-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      cursor: pointer;
+      padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
+
+    /* Bottom Action Bar */
+    .action-bar {
+      padding: 10px 12px;
+      background: #222222;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    button.btn-primary {
+      flex: 1;
+      padding: 9px 12px;
+      background: var(--primary);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      font-size: 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    button.btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    button.btn-secondary {
+      padding: 9px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 500;
+      font-size: 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button.btn-secondary:hover {
+      background: var(--surface-hover);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Selection Indicator -->
+  <div class="selection-bar">
+    <div class="selection-info">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="selection-name" id="selection-name">Rectangle 1739331860</span>
+      <span class="selection-dims" id="selection-dims">364 × 319</span>
+    </div>
+    <button class="mini-btn" id="btn-sample-bg" title="Sample the actual Figma background sitting behind this layer">Sample BG 📸</button>
+  </div>
+
+  <!-- Live WebGL Canvas Preview -->
+  <div class="preview-area">
+    <canvas id="shader-canvas" width="220" height="193"></canvas>
+    <div class="canvas-overlay-actions">
+      <button class="mini-btn" id="btn-save-png">Save PNG</button>
+    </div>
+  </div>
+
+  <!-- Scrollable Uniform Controls -->
+  <div class="controls-body">
+
+    <!-- Presets -->
+    <div>
+      <div class="section-title">Shader Presets</div>
+      <div class="presets-row">
+        <button class="preset-pill active" data-preset="frosted">Frosted Glass</button>
+        <button class="preset-pill" data-preset="caustics">Caustics</button>
+        <button class="preset-pill" data-preset="prism">Prism Edge</button>
+        <button class="preset-pill" data-preset="obsidian">Obsidian Dark</button>
+        <button class="preset-pill" data-preset="sunset">Sunset Glow</button>
+        <button class="preset-pill" data-preset="liquid">Liquid Lens</button>
+      </div>
+    </div>
+
+    <!-- Refraction & Dispersion -->
+    <div>
+      <div class="section-title">Optical Refraction</div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Refraction Strength</span>
+          <span class="ctrl-val" id="val-refract">0.040</span>
+        </div>
+        <input type="range" id="param-refract" min="0" max="0.10" step="0.002" value="0.040">
+      </div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Dispersion (Prism Split)</span>
+          <span class="ctrl-val" id="val-dispersion">0.020</span>
+        </div>
+        <input type="range" id="param-dispersion" min="0" max="0.06" step="0.002" value="0.020">
+      </div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Bevel Depth</span>
+          <span class="ctrl-val" id="val-bevel">24 px</span>
+        </div>
+        <input type="range" id="param-bevel" min="4" max="50" step="1" value="24">
+      </div>
+    </div>
+
+    <!-- Frosted Blur & Caustics -->
+    <div>
+      <div class="section-title">Frosted Blur & Caustics</div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Frost Blur Radius</span>
+          <span class="ctrl-val" id="val-blur">22 px</span>
+        </div>
+        <input type="range" id="param-blur" min="0" max="45" step="1" value="22">
+      </div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Caustics Intensity</span>
+          <span class="ctrl-val" id="val-caustic">0.25</span>
+        </div>
+        <input type="range" id="param-caustic" min="0" max="0.70" step="0.02" value="0.25">
+      </div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Caustics Ripple Speed</span>
+          <span class="ctrl-val" id="val-speed">0.60</span>
+        </div>
+        <input type="range" id="param-speed" min="0" max="2.0" step="0.05" value="0.60">
+      </div>
+    </div>
+
+    <!-- Specular Lighting -->
+    <div>
+      <div class="section-title">Specular Rim Lighting</div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Specular Highlight</span>
+          <span class="ctrl-val" id="val-specular">0.60</span>
+        </div>
+        <input type="range" id="param-specular" min="0" max="1.0" step="0.05" value="0.60">
+      </div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Light Angle</span>
+          <span class="ctrl-val" id="val-angle">-45°</span>
+        </div>
+        <input type="range" id="param-angle" min="-180" max="180" step="5" value="-45">
+      </div>
+    </div>
+
+    <!-- Protection Scrim Tint -->
+    <div>
+      <div class="section-title">Protection Scrim Tint</div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Tint Opacity</span>
+          <span class="ctrl-val" id="val-tint-opacity">0.42</span>
+        </div>
+        <input type="range" id="param-tint-opacity" min="0" max="0.85" step="0.02" value="0.42">
+      </div>
+
+      <div class="ctrl-item">
+        <div class="ctrl-header">
+          <span>Tint Color</span>
+        </div>
+        <div class="color-row">
+          <input type="color" id="param-tint-color" value="#c4c4c4">
+          <span class="ctrl-val" id="val-tint-color">#C4C4C4 (Pixel Baseline)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Apply Action -->
+  <div class="action-bar">
+    <button class="btn-primary" id="btn-apply-shader">
+      <span>✨</span> Apply Shader to Layer
+    </button>
+  </div>
+
+  <!-- Shader Pipeline Script -->
+  <script>
+    const canvas = document.getElementById('shader-canvas');
+    const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, premultipliedAlpha: false });
+
+    // Active State
+    const state = {
+      cardWidth: 364,
+      cardHeight: 319,
+      cornerRadius: 40,
+      refraction: 0.040,
+      dispersion: 0.020,
+      bevelWidth: 24,
+      blurRadius: 22,
+      causticIntensity: 0.25,
+      causticSpeed: 0.60,
+      specular: 0.60,
+      lightAngle: -45, // degrees
+      tintOpacity: 0.42,
+      tintColor: [0.77, 0.77, 0.77],
+      roughness: 0.025
+    };
+
+    // Presets
+    const PRESETS = {
+      frosted: { refraction: 0.035, dispersion: 0.015, bevelWidth: 24, blurRadius: 24, causticIntensity: 0.12, causticSpeed: 0.5, specular: 0.55, lightAngle: -45, tintOpacity: 0.42, tintColor: [0.77, 0.77, 0.77] },
+      caustics: { refraction: 0.050, dispersion: 0.025, bevelWidth: 28, blurRadius: 18, causticIntensity: 0.48, causticSpeed: 1.0, specular: 0.70, lightAngle: -45, tintOpacity: 0.35, tintColor: [0.82, 0.85, 0.90] },
+      prism: { refraction: 0.070, dispersion: 0.055, bevelWidth: 32, blurRadius: 16, causticIntensity: 0.18, causticSpeed: 0.4, specular: 0.85, lightAngle: -30, tintOpacity: 0.28, tintColor: [0.88, 0.88, 0.94] },
+      obsidian: { refraction: 0.025, dispersion: 0.010, bevelWidth: 20, blurRadius: 26, causticIntensity: 0.10, causticSpeed: 0.3, specular: 0.80, lightAngle: -50, tintOpacity: 0.68, tintColor: [0.15, 0.15, 0.18] },
+      sunset: { refraction: 0.045, dispersion: 0.025, bevelWidth: 26, blurRadius: 20, causticIntensity: 0.30, causticSpeed: 0.7, specular: 0.65, lightAngle: -45, tintOpacity: 0.35, tintColor: [0.95, 0.75, 0.65] },
+      liquid: { refraction: 0.080, dispersion: 0.030, bevelWidth: 40, blurRadius: 12, causticIntensity: 0.40, causticSpeed: 0.8, specular: 0.90, lightAngle: -45, tintOpacity: 0.22, tintColor: [0.85, 0.90, 0.95] }
+    };
+
+    // WebGL Shaders
+    const vsSource = `#version 300 es
+      in vec2 aPos;
+      out vec2 vUV;
+      void main() {
+        vUV = aPos * 0.5 + 0.5;
+        gl_Position = vec4(aPos, 0.0, 1.0);
+      }
+    `;
+
+    const fsSource = `#version 300 es
+      precision highp float;
+      in vec2 vUV;
+      out vec4 fragColor;
+
+      uniform vec2 uSize;
+      uniform float uRadius;
+      uniform float uTime;
+      uniform sampler2D uBg;
+
+      uniform float uRefractStrength;
+      uniform float uDispersion;
+      uniform float uBevelWidth;
+      uniform float uBlurRadius;
+      uniform float uCausticIntensity;
+      uniform float uCausticSpeed;
+      uniform float uSpecular;
+      uniform float uLightAngleRad;
+      uniform vec3 uTintColor;
+      uniform float uTintOpacity;
+      uniform float uRoughness;
+
+      float sdRoundBox(vec2 p, vec2 b, float r) {
+        vec2 q = abs(p) - b + r;
+        return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+      }
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+
+      void main() {
+        vec2 p = (vUV - 0.5) * uSize;
+        vec2 halfSize = uSize * 0.5;
+
+        float dist = sdRoundBox(p, halfSize, uRadius);
+        if (dist > 0.0) {
+          fragColor = vec4(0.0);
+          return;
+        }
+
+        float edgeDist = -dist;
+        float bevelFactor = smoothstep(uBevelWidth, 0.0, edgeDist);
+
+        vec2 eps = vec2(1.0, 0.0);
+        vec2 norm2D = normalize(vec2(
+          sdRoundBox(p + eps.xy, halfSize, uRadius) - sdRoundBox(p - eps.xy, halfSize, uRadius),
+          sdRoundBox(p + eps.yx, halfSize, uRadius) - sdRoundBox(p - eps.yx, halfSize, uRadius)
+        ));
+
+        // Refraction
+        vec2 refr = -norm2D * bevelFactor * uRefractStrength;
+        vec2 uvR = vUV + refr * (1.0 + uDispersion);
+        vec2 uvG = vUV + refr;
+        vec2 uvB = vUV + refr * (1.0 - uDispersion);
+
+        // 16-tap blur
+        vec3 blurred = vec3(0.0);
+        float blurScale = (uBlurRadius / uSize.y) * 0.5;
+        for (int i = 0; i < 16; i++) {
+          float fi = float(i);
+          float r = sqrt((fi + 0.5) / 16.0) * blurScale;
+          float theta = fi * 2.39996323;
+          vec2 off = vec2(cos(theta), sin(theta)) * r;
+          blurred.r += texture(uBg, uvR + off).r;
+          blurred.g += texture(uBg, uvG + off).g;
+          blurred.b += texture(uBg, uvB + off).b;
+        }
+        blurred /= 16.0;
+
+        // Caustics
+        float finalCaustic = 0.0;
+        if (uCausticIntensity > 0.001) {
+          vec2 cUV = vUV * 7.0;
+          float t = uTime * uCausticSpeed;
+          float w1 = sin(cUV.x * 2.2 + t) + cos(cUV.y * 2.0 - t * 0.9);
+          float w2 = sin(cUV.x * 3.4 - t * 1.1 + cUV.y * 1.7);
+          finalCaustic = pow(clamp(0.5 + 0.5 * sin(w1 + w2), 0.0, 1.0), 3.2) * uCausticIntensity;
+        }
+
+        // Specular lighting
+        vec3 lightDir = normalize(vec3(cos(uLightAngleRad), -sin(uLightAngleRad), 0.85));
+        vec3 surfaceNorm = normalize(vec3(norm2D * bevelFactor, 1.0 - bevelFactor * 0.6));
+        vec3 halfVec = normalize(lightDir + vec3(0.0, 0.0, 1.0));
+        float spec = pow(max(dot(surfaceNorm, halfVec), 0.0), 22.0) * bevelFactor * uSpecular;
+        float innerRim = pow(bevelFactor, 2.2) * 0.22;
+
+        // Tactile micro-grain
+        float grain = (hash(vUV * uSize) - 0.5) * uRoughness;
+
+        vec3 col = mix(blurred, uTintColor, uTintOpacity);
+        col += vec3(finalCaustic + spec + innerRim + grain);
+
+        float alpha = smoothstep(0.0, -1.5, dist);
+        fragColor = vec4(col * alpha, alpha);
+      }
+    `;
+
+    function compile(type, src) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return s;
+    }
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    // Quad
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    // Background Texture (Procedural warm sunset default or sampled from Figma)
+    const bgTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, bgTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    function createDefaultBg(w = 256, h = 256) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      // Create rich atmospheric background gradient
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#bd2c00');
+      grad.addColorStop(0.3, '#ea580c');
+      grad.addColorStop(0.6, '#7c2d12');
+      grad.addColorStop(1, '#09090b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Light beam
+      const beam = ctx.createRadialGradient(w * 0.3, h * 0.4, 10, w * 0.3, h * 0.4, w * 0.6);
+      beam.addColorStop(0, 'rgba(255, 230, 200, 0.8)');
+      beam.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = beam;
+      ctx.fillRect(0, 0, w, h);
+
+      gl.bindTexture(gl.TEXTURE_2D, bgTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    }
+    createDefaultBg();
+
+    // Resize canvas to match selection aspect ratio
+    function resizeCanvas(targetW, targetH) {
+      state.cardWidth = targetW;
+      state.cardHeight = targetH;
+      const maxH = 150;
+      const maxW = 320;
+      const aspect = targetW / targetH;
+      let dispW, dispH;
+      if (aspect > maxW / maxH) {
+        dispW = maxW;
+        dispH = maxW / aspect;
+      } else {
+        dispH = maxH;
+        dispW = maxH * aspect;
+      }
+      canvas.width = Math.round(dispW * 2); // 2x for crisp preview
+      canvas.height = Math.round(dispH * 2);
+      canvas.style.width = Math.round(dispW) + 'px';
+      canvas.style.height = Math.round(dispH) + 'px';
+      canvas.style.borderRadius = `${Math.round(state.cornerRadius * (dispH / targetH))}px`;
+    }
+    resizeCanvas(364, 319);
+
+    // Uniform locations
+    const uLoc = {
+      size: gl.getUniformLocation(prog, 'uSize'),
+      radius: gl.getUniformLocation(prog, 'uRadius'),
+      time: gl.getUniformLocation(prog, 'uTime'),
+      refract: gl.getUniformLocation(prog, 'uRefractStrength'),
+      dispersion: gl.getUniformLocation(prog, 'uDispersion'),
+      bevel: gl.getUniformLocation(prog, 'uBevelWidth'),
+      blur: gl.getUniformLocation(prog, 'uBlurRadius'),
+      caustic: gl.getUniformLocation(prog, 'uCausticIntensity'),
+      speed: gl.getUniformLocation(prog, 'uCausticSpeed'),
+      specular: gl.getUniformLocation(prog, 'uSpecular'),
+      angleRad: gl.getUniformLocation(prog, 'uLightAngleRad'),
+      tintCol: gl.getUniformLocation(prog, 'uTintColor'),
+      tintOp: gl.getUniformLocation(prog, 'uTintOpacity'),
+      roughness: gl.getUniformLocation(prog, 'uRoughness')
+    };
+
+    // Render loop
+    let startTime = performance.now();
+    function render() {
+      const elapsed = (performance.now() - startTime) * 0.001;
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      gl.useProgram(prog);
+      gl.uniform2f(uLoc.size, canvas.width, canvas.height);
+      const scaledRadius = state.cornerRadius * (canvas.height / state.cardHeight);
+      gl.uniform1f(uLoc.radius, scaledRadius);
+      gl.uniform1f(uLoc.time, elapsed);
+
+      gl.uniform1f(uLoc.refract, state.refraction);
+      gl.uniform1f(uLoc.dispersion, state.dispersion);
+      gl.uniform1f(uLoc.bevel, state.bevelWidth * (canvas.height / state.cardHeight));
+      gl.uniform1f(uLoc.blur, state.blurRadius * (canvas.height / state.cardHeight));
+      gl.uniform1f(uLoc.caustic, state.causticIntensity);
+      gl.uniform1f(uLoc.speed, state.causticSpeed);
+      gl.uniform1f(uLoc.specular, state.specular);
+      gl.uniform1f(uLoc.angleRad, (state.lightAngle * Math.PI) / 180.0);
+      gl.uniform3fv(uLoc.tintCol, state.tintColor);
+      gl.uniform1f(uLoc.tintOp, state.tintOpacity);
+      gl.uniform1f(uLoc.roughness, state.roughness);
+
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+
+    // Figma Message Handling
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === 'selection-change') {
+        const d = msg.data;
+        const nameEl = document.getElementById('selection-name');
+        const dimsEl = document.getElementById('selection-dims');
+        const dotEl = document.getElementById('status-dot');
+
+        if (d.hasSelection) {
+          dotEl.classList.remove('empty');
+          nameEl.textContent = d.name;
+          dimsEl.textContent = `${d.width} × ${d.height}${d.cornerRadius ? ' (R' + d.cornerRadius + ')' : ''}`;
+          if (d.cornerRadius) state.cornerRadius = d.cornerRadius;
+          resizeCanvas(d.width, d.height);
+        } else {
+          dotEl.classList.add('empty');
+          nameEl.textContent = 'No layer selected';
+          dimsEl.textContent = 'Select a shape in Figma';
+        }
+      }
+
+      if (msg.type === 'background-captured') {
+        // Load the captured background into WebGL texture
+        const blob = new Blob([new Uint8Array(msg.bytes)], { type: 'image/png' });
+        const img = new Image();
+        img.onload = () => {
+          gl.bindTexture(gl.TEXTURE_2D, bgTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        };
+        img.src = URL.createObjectURL(blob);
+      }
+    };
+
+    // Ask for selection on start
+    parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
+
+    // UI Bindings
+    function bindSlider(id, key, valId, unit = '', mult = 1) {
+      const s = document.getElementById(id);
+      const v = document.getElementById(valId);
+      s.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        state[key] = val;
+        v.textContent = (mult !== 1 ? (val * mult).toFixed(mult >= 10 ? 0 : 2) : val) + unit;
+      });
+    }
+
+    bindSlider('param-refract', 'refraction', 'val-refract');
+    bindSlider('param-dispersion', 'dispersion', 'val-dispersion');
+    bindSlider('param-bevel', 'bevelWidth', 'val-bevel', ' px');
+    bindSlider('param-blur', 'blurRadius', 'val-blur', ' px');
+    bindSlider('param-caustic', 'causticIntensity', 'val-caustic');
+    bindSlider('param-speed', 'causticSpeed', 'val-speed');
+    bindSlider('param-specular', 'specular', 'val-specular');
+    bindSlider('param-angle', 'lightAngle', 'val-angle', '°');
+    bindSlider('param-tint-opacity', 'tintOpacity', 'val-tint-opacity');
+
+    document.getElementById('param-tint-color').addEventListener('input', (e) => {
+      const hex = e.target.value;
+      const r = parseInt(hex.slice(1,3), 16) / 255;
+      const g = parseInt(hex.slice(3,5), 16) / 255;
+      const b = parseInt(hex.slice(5,7), 16) / 255;
+      state.tintColor = [r, g, b];
+      document.getElementById('val-tint-color').textContent = hex.toUpperCase();
+    });
+
+    // Presets
+    document.querySelectorAll('.preset-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const p = PRESETS[btn.dataset.preset];
+        if (!p) return;
+        Object.assign(state, p);
+
+        document.getElementById('param-refract').value = p.refraction;
+        document.getElementById('val-refract').textContent = p.refraction;
+        document.getElementById('param-dispersion').value = p.dispersion;
+        document.getElementById('val-dispersion').textContent = p.dispersion;
+        document.getElementById('param-bevel').value = p.bevelWidth;
+        document.getElementById('val-bevel').textContent = p.bevelWidth + ' px';
+        document.getElementById('param-blur').value = p.blurRadius;
+        document.getElementById('val-blur').textContent = p.blurRadius + ' px';
+        document.getElementById('param-caustic').value = p.causticIntensity;
+        document.getElementById('val-caustic').textContent = p.causticIntensity;
+        document.getElementById('param-speed').value = p.causticSpeed;
+        document.getElementById('val-speed').textContent = p.causticSpeed;
+        document.getElementById('param-specular').value = p.specular;
+        document.getElementById('val-specular').textContent = p.specular;
+        document.getElementById('param-angle').value = p.lightAngle;
+        document.getElementById('val-angle').textContent = p.lightAngle + '°';
+        document.getElementById('param-tint-opacity').value = p.tintOpacity;
+        document.getElementById('val-tint-opacity').textContent = p.tintOpacity;
+
+        const toHex = c => Math.round(c * 255).toString(16).padStart(2, '0');
+        const hex = `#${toHex(p.tintColor[0])}${toHex(p.tintColor[1])}${toHex(p.tintColor[2])}`;
+        document.getElementById('param-tint-color').value = hex;
+        document.getElementById('val-tint-color').textContent = hex.toUpperCase();
+      });
+    });
+
+    // Apply Shader to Layer in Figma
+    document.getElementById('btn-apply-shader').addEventListener('click', () => {
+      // Render full high-resolution 2x offscreen texture
+      const offscreen = document.createElement('canvas');
+      const scale = 2;
+      offscreen.width = state.cardWidth * scale;
+      offscreen.height = state.cardHeight * scale;
+
+      const offGl = offscreen.getContext('webgl2', { preserveDrawingBuffer: true, premultipliedAlpha: false });
+      const offProg = offGl.createProgram();
+      offGl.attachShader(offProg, compileShader(offGl, offGl.VERTEX_SHADER, vsSource));
+      offGl.attachShader(offProg, compileShader(offGl, offGl.FRAGMENT_SHADER, fsSource));
+      offGl.linkProgram(offProg);
+      offGl.useProgram(offProg);
+
+      // Bind quad
+      const offVao = offGl.createVertexArray();
+      offGl.bindVertexArray(offVao);
+      const offVbo = offGl.createBuffer();
+      offGl.bindBuffer(offGl.ARRAY_BUFFER, offVbo);
+      offGl.bufferData(offGl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), offGl.STATIC_DRAW);
+      const a = offGl.getAttribLocation(offProg, 'aPos');
+      offGl.enableVertexAttribArray(a);
+      offGl.vertexAttribPointer(a, 2, offGl.FLOAT, false, 0, 0);
+
+      // Copy texture
+      const offTex = offGl.createTexture();
+      offGl.bindTexture(offGl.TEXTURE_2D, offTex);
+      offGl.texParameteri(offGl.TEXTURE_2D, offGl.TEXTURE_WRAP_S, offGl.CLAMP_TO_EDGE);
+      offGl.texParameteri(offGl.TEXTURE_2D, offGl.TEXTURE_WRAP_T, offGl.CLAMP_TO_EDGE);
+      offGl.texParameteri(offGl.TEXTURE_2D, offGl.TEXTURE_MIN_FILTER, offGl.LINEAR);
+      offGl.texParameteri(offGl.TEXTURE_2D, offGl.TEXTURE_MAG_FILTER, offGl.LINEAR);
+      offGl.copyTexImage2D(offGl.TEXTURE_2D, 0, offGl.RGBA, 0, 0, offscreen.width, offscreen.height, 0);
+
+      // Convert current canvas to blob and send to Figma
+      canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const bytes = Array.from(new Uint8Array(reader.result));
+          parent.postMessage({ pluginMessage: { type: 'apply-shader', bytes } }, '*');
+        };
+        reader.readAsArrayBuffer(blob);
+      }, 'image/png');
+    });
+
+    function compileShader(glContext, type, src) {
+      const s = glContext.createShader(type);
+      glContext.shaderSource(s, src);
+      glContext.compileShader(s);
+      return s;
+    }
+
+    // Sample Figma Background Button
+    document.getElementById('btn-sample-bg').addEventListener('click', () => {
+      parent.postMessage({ pluginMessage: { type: 'capture-background' } }, '*');
+    });
+
+    // Save PNG
+    document.getElementById('btn-save-png').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.download = `pixel_shader_${Date.now()}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    });
+  </script>
+</body>
+</html>
